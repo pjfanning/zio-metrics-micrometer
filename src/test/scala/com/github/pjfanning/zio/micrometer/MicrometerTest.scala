@@ -22,7 +22,7 @@ object PrometheusTest extends ZIOSpecDefault {
     g <- Gauge.unsafeLabelled("simple_gauge", None, Array("method", "resource"))
     _ <- g(Array("get", "users")).inc
     _ <- g(Array("get", "users")).inc(2)
-    _ <- g(Array("get", "users")).dec(0.5)
+    _ <- g(Array("get", "users")).dec(1)
   } yield g(Array("get", "users"))
 
   override def spec = suite("MicrometerLabelsTest")(
@@ -39,7 +39,7 @@ object PrometheusTest extends ZIOSpecDefault {
           for {
             gauge <- gaugeTestZIO
             gaugeValue <- gauge.get
-          } yield assert(gaugeValue)(equalTo(2.5))
+          } yield assert(gaugeValue)(equalTo(2.0))
         }
       )
     ).provideCustomLayer(env)

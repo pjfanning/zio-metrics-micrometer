@@ -145,10 +145,6 @@ private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
   }
 }
 
-private class NumberFunction(fun: => Double) extends Supplier[Number] {
-  override def get(): Number = fun
-}
-
 object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   private[micrometer] val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, Gauge]]()
