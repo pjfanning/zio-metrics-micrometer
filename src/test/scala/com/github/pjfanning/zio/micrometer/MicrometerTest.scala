@@ -1,5 +1,6 @@
 package com.github.pjfanning.zio.micrometer
 
+import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.Clock
 import zio.test.Assertion._
@@ -18,6 +19,13 @@ object MicrometerTest extends ZIOSpecDefault {
     _ <- c(Array("get", "users")).inc(2)
   } yield c(Array("get", "users"))
 
+  val counterZipTestZIO: ZIO[Registry, Throwable, (Meter.Id, Meter.Id)] = for {
+    c1 <- Counter.unsafeLabelled("simple_counter", None, Array("method", "resource"))
+    c2 <- Counter.unsafeLabelled("simple_counter", None, Array("method", "resource"))
+    id1 <- c1(Array("get", "users")).asInstanceOf[HasMicrometerMeterId].getMeterId
+    id2 <- c2(Array("get", "users")).asInstanceOf[HasMicrometerMeterId].getMeterId
+  } yield (id1, id2)
+
   val gaugeTestZIO: ZIO[Registry, Throwable, Gauge] = for {
     g <- Gauge.unsafeLabelled("simple_gauge", None, Array("method", "resource"))
     _ <- g(Array("get", "users")).inc
@@ -32,6 +40,11 @@ object MicrometerTest extends ZIOSpecDefault {
             counter <- counterTestZIO
             counterValue <- counter.get
           } yield assert(counterValue)(equalTo(3.0))
+        },
+        testM("counter ids match") {
+          for {
+            (id1, id2) <- counterZipTestZIO
+          } yield assert(id1)(equalTo(id2))
         }
       ),
       suite("Gauge")(
