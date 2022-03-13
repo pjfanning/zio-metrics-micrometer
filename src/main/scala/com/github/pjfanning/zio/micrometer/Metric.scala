@@ -35,21 +35,13 @@ private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
 
 object Counter extends LabelledMetric[Registry, Throwable, Counter] {
 
-  private[micrometer] val counterRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, instrument.Counter]]()
-
-  private[micrometer] def counterMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, instrument.Counter] = {
-    counterRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, instrument.Counter]())
-  }
-
   private[micrometer] def getCounter(registry: instrument.MeterRegistry, name: String,
                                      help: Option[String], tags: Seq[instrument.Tag]): instrument.Counter = {
-    counterMap(registry).getOrElseUpdate(MeterKey(name, tags), {
-      instrument.Counter
-        .builder(name)
-        .description(help.getOrElse(""))
-        .tags(tags.asJava)
-        .register(registry)
-    })
+    instrument.Counter
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+      .register(registry)
   }
 
   def unsafeLabelled(
@@ -148,9 +140,9 @@ private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
 
 object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
-  private[micrometer] val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, Gauge]]()
+  private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, Gauge]]()
 
-  private[micrometer] def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, Gauge] = {
+  private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, Gauge] = {
     gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, Gauge]())
   }
 
