@@ -41,7 +41,7 @@ object MicrometerTest extends ZIOSpecDefault {
             counterValue <- counter.get
           } yield assert(counterValue)(equalTo(3.0))
         },
-        testM("counter ids match") {
+        test("counter ids match") {
           for {
             (id1, id2) <- counterZipTestZIO
           } yield assert(id1)(equalTo(id2))
