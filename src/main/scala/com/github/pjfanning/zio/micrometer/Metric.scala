@@ -22,9 +22,7 @@ private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
                              labelNames: Seq[String]) {
 
   def counterFor(labelValues: Seq[String]): instrument.Counter = {
-    val tags = labelNames.zip(labelValues).map { case (labelName, labelValue) =>
-      new instrument.ImmutableTag(labelName, labelValue)
-    }
+    val tags = zipLabelsAsTags(labelNames, labelValues)
     Counter.getCounter(meterRegistry, name, help, tags)
   }
 }
@@ -129,9 +127,7 @@ private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
                            labelNames: Seq[String]) {
 
   def gaugeFor(labelValues: Seq[String]): AtomicDouble = {
-    val tags = labelNames.zip(labelValues).map { case (labelName, labelValue) =>
-      new instrument.ImmutableTag(labelName, labelValue)
-    }
+    val tags = zipLabelsAsTags(labelNames, labelValues)
     Gauge.getGauge(meterRegistry, name, help, tags)
   }
 }

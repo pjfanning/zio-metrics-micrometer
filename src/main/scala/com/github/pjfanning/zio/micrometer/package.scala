@@ -46,4 +46,10 @@ package object micrometer {
 
   def collect: RIO[Registry, ju.List[instrument.Meter]] =
     ZIO.serviceWith(_.collect)
+
+  def zipLabelsAsTags(labelNames: Seq[String], labelValues: Seq[String]): Seq[instrument.Tag] = {
+    labelNames.zip(labelValues).map { case (labelName, labelValue) =>
+      new instrument.ImmutableTag(labelName, labelValue)
+    }
+  }
 }
