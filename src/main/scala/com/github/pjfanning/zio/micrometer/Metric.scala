@@ -169,9 +169,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
         override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
         override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
-        override def dec(amount: Double): UIO[Unit] = for {
-          negativeAmount <- ZIO.succeed(-amount)
-        } yield inc(negativeAmount)
+        override def dec(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(-amount))
         override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
       }
     })
