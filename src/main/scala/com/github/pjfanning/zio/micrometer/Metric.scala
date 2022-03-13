@@ -19,6 +19,7 @@ trait HasMicrometerMeterId {
 trait Counter {
   def inc: UIO[Unit] = inc(1)
   def inc(amount: Double): UIO[Unit]
+  def get: UIO[Double]
 }
 
 private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
@@ -64,8 +65,9 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
       new Counter with HasMicrometerMeterId {
         private lazy val counter = counterWrapper.counterFor(labelValues)
 
-        override def inc(amount: Double): UIO[Unit] =
-          ZIO.effectTotal(counter.increment(amount))
+        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(counter.increment(amount))
+
+        override def get: UIO[Double] = ZIO.effectTotal(counter.count())
 
         override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(counter.getId)
       }
@@ -263,10 +265,10 @@ object Histogram extends LabelledMetricP[Registry with Clock, Throwable, Buckets
       clock <- ZIO.service[Clock.Service]
       pHistogram <- updateRegistry { r =>
                      ZIO.effect {
-                       val builder = instrument.Histogram
+                       val builder = instrument.Timer
                          .builder(name)
-                         .help(help.getOrElse(""))
-                         .labelNames(labels: _*)
+                         .description(help.getOrElse(""))
+                         .publishPercentileHistogram()
                        (
                          buckets match {
                            case Buckets.Default              => builder
