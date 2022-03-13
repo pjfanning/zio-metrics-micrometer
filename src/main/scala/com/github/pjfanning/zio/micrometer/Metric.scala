@@ -1,6 +1,7 @@
 package com.github.pjfanning.zio.micrometer
 
 import io.micrometer.core.instrument
+import io.micrometer.core.instrument.Meter
 import zio._
 import zio.clock._
 import zio.duration.Duration
@@ -10,6 +11,10 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
+
+trait HasMicrometerMeterId {
+  def getMeterId: UIO[instrument.Meter.Id]
+}
 
 trait Counter {
   def inc: UIO[Unit] = inc(1)
@@ -56,9 +61,13 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
         ZIO.effect(new CounterWrapper(r, name, help, labels))
       }
     } yield { (labelValues: Seq[String]) =>
-      new Counter {
+      new Counter with HasMicrometerMeterId {
+        private lazy val counter = counterWrapper.counterFor(labelValues)
+
         override def inc(amount: Double): UIO[Unit] =
-          ZIO.effectTotal(counterWrapper.counterFor(labelValues).increment(amount))
+          ZIO.effectTotal(counter.increment(amount))
+
+        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(counter.getId)
       }
     }
 }
@@ -112,8 +121,11 @@ private abstract class TimerMetricImpl(clock: Clock.Service) extends TimerMetric
     }
 }
 
-trait Gauge {
+trait ReadOnlyGauge {
   def get: UIO[Double]
+}
+
+trait Gauge extends ReadOnlyGauge {
   def set(value: Double): UIO[Unit]
   def inc: UIO[Unit] = inc(1)
   def inc(amount: Double): UIO[Unit]
@@ -126,33 +138,94 @@ private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
                            help: Option[String],
                            labelNames: Seq[String]) {
 
-  def gaugeFor(labelValues: Seq[String]): AtomicDouble = {
+  def gaugeFor(labelValues: Seq[String]): Gauge = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
     Gauge.getGauge(meterRegistry, name, help, tags)
   }
 }
 
+private class NumberFunction(fun: => Double) extends Supplier[Number] {
+  override def get(): Number = fun
+}
+
 object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
-  private[micrometer] val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, AtomicDouble]]()
+  private[micrometer] val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, Gauge]]()
 
-  private[micrometer] def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, AtomicDouble] = {
-    gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, AtomicDouble]())
+  private[micrometer] def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, Gauge] = {
+    gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, Gauge]())
   }
 
   private[micrometer] def getGauge(registry: instrument.MeterRegistry, name: String,
-                                   help: Option[String], tags: Seq[instrument.Tag]): AtomicDouble = {
+                                   help: Option[String], tags: Seq[instrument.Tag]): Gauge = {
     gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
       val atomicDouble = new AtomicDouble()
-      instrument.Gauge
+      val mGauge = instrument.Gauge
         .builder(name, new Supplier[Number]() {
           override def get(): Number = atomicDouble.get()
         })
         .description(help.getOrElse(""))
         .tags(tags.asJava)
         .register(registry)
-      atomicDouble
+      new Gauge with HasMicrometerMeterId {
+        override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
+        override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
+        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
+        override def dec(amount: Double): UIO[Unit] = for {
+          negativeAmount <- ZIO.succeed(-amount)
+        } yield inc(negativeAmount)
+        override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+      }
     })
+  }
+
+  def unsafeLabelled(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    labelValues: Seq[String],
+    fun: => Double
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gauge <- updateRegistry { r =>
+        ZIO.effect(
+          instrument.Gauge.builder(name, new Supplier[Number]() {
+            override def get(): Number = fun
+          }).description(help.getOrElse(""))
+            .tags(zipLabelsAsTags(labelNames, labelValues).asJava)
+            .register(r)
+        )
+      }
+    } yield
+      new ReadOnlyGauge with HasMicrometerMeterId {
+        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
+        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
+      }
+  }
+
+  def unsafeLabelled[T](
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    labelValues: Seq[String],
+    t: T,
+    fun: T => Double
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gauge <- updateRegistry { r =>
+        ZIO.effect(
+          instrument.Gauge.builder(name, new Supplier[Number]() {
+            override def get(): Number = fun(t)
+          }).description(help.getOrElse(""))
+            .tags(zipLabelsAsTags(labelNames, labelValues).asJava)
+            .register(r)
+        )
+      }
+    } yield
+      new ReadOnlyGauge with HasMicrometerMeterId {
+        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
+        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
+      }
   }
 
   def unsafeLabelled(
@@ -165,13 +238,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         ZIO.effect(new GaugeWrapper(r, name, help, labels))
       }
     } yield { (labelValues: Seq[String]) =>
-      new Gauge {
-        val atomicDouble = gaugeWrapper.gaugeFor(labelValues)
-        override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
-        override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
-        override def dec(amount: Double): UIO[Unit] = inc(-amount)
-      }
+      gaugeWrapper.gaugeFor(labelValues)
     }
 }
 
