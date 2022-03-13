@@ -35,7 +35,7 @@ object PrometheusTest extends DefaultRunnableSpec {
         }
       ),
       suite("Gauge")(
-        testM("gauage increases and decreases by `inc/dec` amount") {
+        testM("gauge increases and decreases by `inc/dec` amount") {
           for {
             gauge <- gaugeTestZIO
             gaugeValue <- gauge.get

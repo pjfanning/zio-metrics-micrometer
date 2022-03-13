@@ -15,5 +15,6 @@ lazy val root = (project in file("."))
       "dev.zio"          %% "zio-test-sbt"                   % zioVersion % Test,
       "io.micrometer"    %  "micrometer-core"                % micrometerVersion,
       "io.micrometer"    %  "micrometer-registry-prometheus" % micrometerVersion % Test
-    )
+    ),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
