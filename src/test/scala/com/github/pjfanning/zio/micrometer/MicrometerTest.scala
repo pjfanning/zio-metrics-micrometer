@@ -7,7 +7,7 @@ import zio.test.assert
 import zio.ZIO
 import zio.test.ZIOSpecDefault
 
-object PrometheusTest extends ZIOSpecDefault {
+object MicrometerTest extends ZIOSpecDefault {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
   private val env = Clock.live ++ Registry.makeWith(registry)
@@ -22,10 +22,10 @@ object PrometheusTest extends ZIOSpecDefault {
     g <- Gauge.unsafeLabelled("simple_gauge", None, Array("method", "resource"))
     _ <- g(Array("get", "users")).inc
     _ <- g(Array("get", "users")).inc(2)
-    _ <- g(Array("get", "users")).dec(1)
+    _ <- g(Array("get", "users")).dec(0.5)
   } yield g(Array("get", "users"))
 
-  override def spec = suite("MicrometerLabelsTest")(
+  override def spec = suite("MicrometerTest")(
       suite("Counter")(
         test("counter increases by `inc` amount") {
           for {
@@ -39,7 +39,7 @@ object PrometheusTest extends ZIOSpecDefault {
           for {
             gauge <- gaugeTestZIO
             gaugeValue <- gauge.get
-          } yield assert(gaugeValue)(equalTo(2.0))
+          } yield assert(gaugeValue)(equalTo(2.5))
         }
       )
     ).provideCustomLayer(env)
