@@ -2,10 +2,10 @@ package com.github.pjfanning.zio
 
 import java.{util => ju}
 import io.micrometer.core.instrument
-import zio.{Has, RIO, Semaphore, Task, UIO, ULayer, ZIO}
+import zio.{RIO, Semaphore, Task, UIO, ULayer, ZIO}
 
 package object micrometer {
-  type Registry = Has[Registry.Service]
+  type Registry = Registry.Service
 
   object Registry {
     trait Service {
@@ -25,7 +25,7 @@ package object micrometer {
       }
 
       def collect: zio.UIO[ju.List[instrument.Meter]] =
-        ZIO.effectTotal(registry.getMeters)
+        ZIO.succeed(registry.getMeters)
     }
 
     private object ServiceImpl {
@@ -39,13 +39,13 @@ package object micrometer {
   }
 
   def collectorRegistry: RIO[Registry, instrument.MeterRegistry] =
-    ZIO.serviceWith(_.collectorRegistry)
+    ZIO.serviceWithZIO(_.collectorRegistry)
 
   def updateRegistry[A](f: instrument.MeterRegistry => Task[A]): RIO[Registry, A] =
-    ZIO.serviceWith(_.updateRegistry(f))
+    ZIO.serviceWithZIO(_.updateRegistry(f))
 
   def collect: RIO[Registry, ju.List[instrument.Meter]] =
-    ZIO.serviceWith(_.collect)
+    ZIO.serviceWithZIO(_.collect)
 
   def zipLabelsAsTags(labelNames: Seq[String], labelValues: Seq[String]): Seq[instrument.Tag] = {
     labelNames.zip(labelValues).map { case (labelName, labelValue) =>

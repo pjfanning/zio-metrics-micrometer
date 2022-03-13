@@ -3,8 +3,7 @@ package com.github.pjfanning.zio.micrometer
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import zio._
-import zio.clock._
-import zio.duration.Duration
+import zio.Duration
 
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
@@ -59,17 +58,17 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
   ): ZIO[Registry, Throwable, Seq[String] => Counter] =
     for {
       counterWrapper <- updateRegistry { r =>
-        ZIO.effect(new CounterWrapper(r, name, help, labels))
+        ZIO.attempt(new CounterWrapper(r, name, help, labels))
       }
     } yield { (labelValues: Seq[String]) =>
       new Counter with HasMicrometerMeterId {
         private lazy val counter = counterWrapper.counterFor(labelValues)
 
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(counter.increment(amount))
+        override def inc(amount: Double): UIO[Unit] = ZIO.succeed(counter.increment(amount))
 
-        override def get: UIO[Double] = ZIO.effectTotal(counter.count())
+        override def get: UIO[Double] = ZIO.succeed(counter.count())
 
-        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(counter.getId)
+        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(counter.getId)
       }
     }
 }
@@ -92,7 +91,7 @@ trait TimerMetric {
   def startTimer: UIO[Timer]
 
   /** A managed timer resource. */
-  def timer: UManaged[Timer] = startTimer.toManaged(_.stop)
+  def timer: UManaged[Timer] = startTimer.toManagedWith(_.stop)
 
   /** Runs the given effect and records in the metric how much time it took to succeed or fail. */
   def observe[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = timer.use(_ => zio)
@@ -111,7 +110,7 @@ trait TimerMetric {
   def observe(amount: Duration): UIO[Unit]
 }
 
-private abstract class TimerMetricImpl(clock: Clock.Service) extends TimerMetric {
+private abstract class TimerMetricImpl(clock: Clock) extends TimerMetric {
   override def startTimer: UIO[Timer] =
     clock.instant.map { startTime =>
       new Timer {
@@ -170,13 +169,13 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         .tags(tags.asJava)
         .register(registry)
       new Gauge with HasMicrometerMeterId {
-        override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
-        override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
+        override def get: UIO[Double]               = ZIO.succeed(atomicDouble.get())
+        override def set(value: Double): UIO[Unit]  = ZIO.succeed(atomicDouble.set(value))
+        override def inc(amount: Double): UIO[Unit] = ZIO.succeed(atomicDouble.addAndGet(amount))
         override def dec(amount: Double): UIO[Unit] = for {
           negativeAmount <- ZIO.succeed(-amount)
         } yield inc(negativeAmount)
-        override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+        override def getMeterId: UIO[Meter.Id]      = ZIO.succeed(mGauge.getId)
       }
     })
   }
@@ -190,7 +189,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
     for {
       gauge <- updateRegistry { r =>
-        ZIO.effect(
+        ZIO.attempt(
           instrument.Gauge.builder(name, new Supplier[Number]() {
             override def get(): Number = fun
           }).description(help.getOrElse(""))
@@ -200,8 +199,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       }
     } yield
       new ReadOnlyGauge with HasMicrometerMeterId {
-        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
-        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
+        override def get: UIO[Double] = ZIO.succeed(gauge.value())
+        override def getMeterId: UIO[Meter.Id] = ZIO.succeed(gauge.getId)
       }
   }
 
@@ -215,7 +214,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
     for {
       gauge <- updateRegistry { r =>
-        ZIO.effect(
+        ZIO.attempt(
           instrument.Gauge.builder(name, new Supplier[Number]() {
             override def get(): Number = fun(t)
           }).description(help.getOrElse(""))
@@ -225,8 +224,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       }
     } yield
       new ReadOnlyGauge with HasMicrometerMeterId {
-        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
-        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
+        override def get: UIO[Double] = ZIO.succeed(gauge.value())
+        override def getMeterId: UIO[Meter.Id] = ZIO.succeed(gauge.getId)
       }
   }
 
@@ -237,7 +236,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, Seq[String] => Gauge] =
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new GaugeWrapper(r, name, help, labels))
+        ZIO.attempt(new GaugeWrapper(r, name, help, labels))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)

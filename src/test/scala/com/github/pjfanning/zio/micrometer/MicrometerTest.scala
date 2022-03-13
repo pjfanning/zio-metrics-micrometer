@@ -1,12 +1,13 @@
 package com.github.pjfanning.zio.micrometer
 
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
-import zio.clock.Clock
+import zio.Clock
 import zio.test.Assertion._
-import zio.test.{DefaultRunnableSpec, ZSpec, assert}
+import zio.test.assert
 import zio.ZIO
+import zio.test.ZIOSpecDefault
 
-object PrometheusTest extends DefaultRunnableSpec {
+object PrometheusTest extends ZIOSpecDefault {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
   private val env = Clock.live ++ Registry.makeWith(registry)
@@ -24,10 +25,9 @@ object PrometheusTest extends DefaultRunnableSpec {
     _ <- g(Array("get", "users")).dec(0.5)
   } yield g(Array("get", "users"))
 
-  override def spec: ZSpec[Environment, Failure] =
-    suite("MicrometerLabelsTest")(
+  override def spec = suite("MicrometerLabelsTest")(
       suite("Counter")(
-        testM("counter increases by `inc` amount") {
+        test("counter increases by `inc` amount") {
           for {
             counter <- counterTestZIO
             counterValue <- counter.get
@@ -35,7 +35,7 @@ object PrometheusTest extends DefaultRunnableSpec {
         }
       ),
       suite("Gauge")(
-        testM("gauage increases and decreases by `inc/dec` amount") {
+        test("gauge increases and decreases by `inc/dec` amount") {
           for {
             gauge <- gaugeTestZIO
             gaugeValue <- gauge.get
