@@ -50,16 +50,6 @@ pomExtra := (
       <name>PJ Fanning</name>
       <url>https://github.com/pjfanning</url>
     </developer>
-    <developer>
-      <id>ivantopo</id>
-      <name>Ivan Topolnjak</name>
-      <url>https://twitter.com/ivantopo</url>
-    </developer>
-    <developer>
-      <id>dpsoft</id>
-      <name>Diego Parra</name>
-      <url>https://twitter.com/diegolparra</url>
-    </developer>
   </developers>
   )
 
@@ -67,6 +57,7 @@ ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec(Zulu, "8"))
 ThisBuild / githubWorkflowTargetTags ++= Seq("v*")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq(
   RefPredicate.Equals(Ref.Branch("main")),
+  RefPredicate.Equals(Ref.Branch("zio2")),
   RefPredicate.StartsWith(Ref.Tag("v"))
 )
 
