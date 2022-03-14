@@ -1,3 +1,7 @@
+import sbtghactions.JavaSpec.Distribution.Zulu
+
+organization := "com.github.pjfanning"
+
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 ThisBuild / scalaVersion := "2.13.8"
@@ -18,3 +22,64 @@ lazy val root = (project in file("."))
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
+
+publishMavenStyle := true
+
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+}
+
+Test / publishArtifact := false
+
+pomIncludeRepository := { _ => false }
+
+homepage := Some(url("https://github.com/pjfanning/micrometer-akka"))
+
+licenses := Seq("The Apache Software License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+
+pomExtra := (
+  <developers>
+    <developer>
+      <id>pjfanning</id>
+      <name>PJ Fanning</name>
+      <url>https://github.com/pjfanning</url>
+    </developer>
+    <developer>
+      <id>ivantopo</id>
+      <name>Ivan Topolnjak</name>
+      <url>https://twitter.com/ivantopo</url>
+    </developer>
+    <developer>
+      <id>dpsoft</id>
+      <name>Diego Parra</name>
+      <url>https://twitter.com/diegolparra</url>
+    </developer>
+  </developers>
+  )
+
+ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec(Zulu, "8"))
+ThisBuild / githubWorkflowTargetTags ++= Seq("v*")
+ThisBuild / githubWorkflowPublishTargetBranches := Seq(
+  RefPredicate.Equals(Ref.Branch("main")),
+  RefPredicate.StartsWith(Ref.Tag("v"))
+)
+
+ThisBuild / githubWorkflowPublish := Seq(
+  WorkflowStep.Sbt(
+    List("ci-release"),
+    env = Map(
+      "PGP_PASSPHRASE" -> "${{ secrets.PGP_PASSPHRASE }}",
+      "PGP_SECRET" -> "${{ secrets.PGP_SECRET }}",
+      "SONATYPE_PASSWORD" -> "${{ secrets.CI_DEPLOY_PASSWORD }}",
+      "SONATYPE_USERNAME" -> "${{ secrets.CI_DEPLOY_USERNAME }}",
+      "CI_SNAPSHOT_RELEASE" -> "+publishSigned"
+    )
+  )
+)
+
