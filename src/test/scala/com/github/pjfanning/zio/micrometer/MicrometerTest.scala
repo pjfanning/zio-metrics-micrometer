@@ -14,15 +14,15 @@ object MicrometerTest extends ZIOSpecDefault {
   private val env = Clock.live ++ Registry.makeWith(registry)
 
   val counterTestZIO: ZIO[Registry, Throwable, Counter] = for {
-    c <- Counter.unsafeLabelled("simple_counter", None, Array("method", "resource"))
-    _ <- c(Array("get", "users")).inc
+    c <- Counter.unsafeLabelled("simple_counter", None, Seq("method", "resource"))
+    _ <- c(Seq("get", "users")).inc
     _ <- c(Array("get", "users")).inc(2)
-  } yield c(Array("get", "users"))
+  } yield c(Seq("get", "users"))
 
   val counterZipTestZIO: ZIO[Registry, Throwable, (Meter.Id, Meter.Id)] = for {
-    c1 <- Counter.unsafeLabelled("simple_counter", None, Array("method", "resource"))
+    c1 <- Counter.unsafeLabelled("simple_counter", None, Seq("method", "resource"))
     c2 <- Counter.unsafeLabelled("simple_counter", None, Array("method", "resource"))
-    id1 <- c1(Array("get", "users")).asInstanceOf[HasMicrometerMeterId].getMeterId
+    id1 <- c1(Seq("get", "users")).asInstanceOf[HasMicrometerMeterId].getMeterId
     id2 <- c2(Array("get", "users")).asInstanceOf[HasMicrometerMeterId].getMeterId
   } yield (id1, id2)
 
@@ -31,7 +31,7 @@ object MicrometerTest extends ZIOSpecDefault {
     _ <- g(Array("get", "users")).inc
     _ <- g(Array("get", "users")).inc(2)
     _ <- g(Array("get", "users")).dec(0.5)
-  } yield g(Array("get", "users"))
+  } yield g(Seq("get", "users"))
 
   override def spec = suite("MicrometerTest")(
       suite("Counter")(
