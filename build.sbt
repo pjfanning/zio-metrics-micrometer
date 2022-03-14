@@ -37,7 +37,7 @@ Test / publishArtifact := false
 
 pomIncludeRepository := { _ => false }
 
-homepage := Some(url("https://github.com/pjfanning/micrometer-akka"))
+homepage := Some(url("https://github.com/pjfanning/zio-metrics-micrometer"))
 
 licenses := Seq("The Apache Software License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
