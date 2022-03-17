@@ -49,26 +49,26 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   override def spec = suite("MicrometerUnsafeTest")(
       suite("Counter")(
-        testM("counter increases by `inc` amount") {
+        test("counter increases by `inc` amount") {
           for {
             counter <- counterTestZIO
             counterValue <- counter.get
           } yield assert(counterValue)(equalTo(3.0))
         },
-        testM("counter ids match") {
+        test("counter ids match") {
           for {
             (id1, id2) <- counterZipTestZIO
           } yield assert(id1)(equalTo(id2))
         }
       ),
       suite("Gauge")(
-        testM("gauge increases and decreases by `inc/dec` amount") {
+        test("gauge increases and decreases by `inc/dec` amount") {
           for {
             gauge <- gaugeTestZIO
             gaugeValue <- gauge.get
           } yield assert(gaugeValue)(equalTo(2.5))
         },
-        testM("gauge based on function works") {
+        test("gauge based on function works") {
           for {
             gauge <- functionGaugeTestZIO
             gaugeValue <- gauge.get
@@ -79,7 +79,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
             gaugeValue <- gauge.get
           } yield assert(gaugeValue)(equalTo(functionGaugeHolder.get()))
         },
-        testM("gauge based on t function works") {
+        test("gauge based on t function works") {
           for {
             gauge <- tFunctionGaugeTestZIO
             gaugeValue <- gauge.get
@@ -91,5 +91,5 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
           } yield assert(gaugeValue)(equalTo(tFunctionGaugeHolder.get()))
         }
       )
-    ).provideCustomLayer(env)testtesttesttesttest
+    ).provideCustomLayer(env)
 }
