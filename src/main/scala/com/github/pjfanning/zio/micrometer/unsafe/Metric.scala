@@ -40,17 +40,17 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
   ): ZIO[Registry, Throwable, Seq[String] => Counter] =
     for {
       counterWrapper <- updateRegistry { r =>
-        ZIO.effect(new CounterWrapper(r, name, help, labelNames))
+        ZIO.attempt(new CounterWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
       new Counter with HasMicrometerMeterId {
         private lazy val counter = counterWrapper.counterFor(labelValues)
 
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(counter.increment(amount))
+        override def inc(amount: Double): UIO[Unit] = ZIO.succeed(counter.increment(amount))
 
-        override def get: UIO[Double] = ZIO.effectTotal(counter.count())
+        override def get: UIO[Double] = ZIO.succeed(counter.count())
 
-        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(counter.getId)
+        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(counter.getId)
       }
     }
 }
@@ -162,11 +162,11 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         .tags(tags.asJava)
         .register(registry)
       new Gauge with HasMicrometerMeterId {
-        override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
-        override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
-        override def dec(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(-amount))
-        override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+        override def get: UIO[Double]               = ZIO.succeed(atomicDouble.get())
+        override def set(value: Double): UIO[Unit]  = ZIO.succeed(atomicDouble.set(value))
+        override def inc(amount: Double): UIO[Unit] = ZIO.succeed(atomicDouble.addAndGet(amount))
+        override def dec(amount: Double): UIO[Unit] = ZIO.succeed(atomicDouble.addAndGet(-amount))
+        override def getMeterId: UIO[Meter.Id]      = ZIO.succeed(mGauge.getId)
       }
     })
   }
@@ -182,8 +182,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .tags(tags.asJava)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
-      override def get: UIO[Double]               = ZIO.effectTotal(fun)
-      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+      override def get: UIO[Double]               = ZIO.succeed(fun)
+      override def getMeterId: UIO[Meter.Id]      = ZIO.succeed(mGauge.getId)
     }
   }
 
@@ -198,8 +198,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .tags(tags.asJava)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
-      override def get: UIO[Double]               = ZIO.effectTotal(fun(t))
-      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+      override def get: UIO[Double]               = ZIO.succeed(fun(t))
+      override def getMeterId: UIO[Meter.Id]      = ZIO.succeed(mGauge.getId)
     }
   }
 
@@ -211,7 +211,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new FunctionGaugeWrapper(r, name, help, labelNames, fun()))
+        ZIO.attempt(new FunctionGaugeWrapper(r, name, help, labelNames, fun()))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
@@ -227,7 +227,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun))
+        ZIO.attempt(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
@@ -241,7 +241,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
   ): ZIO[Registry, Throwable, Seq[String] => Gauge] =
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new GaugeWrapper(r, name, help, labelNames))
+        ZIO.attempt(new GaugeWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
