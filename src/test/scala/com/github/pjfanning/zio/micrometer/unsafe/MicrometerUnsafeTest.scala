@@ -11,7 +11,7 @@ import zio.ZIO
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Random
 
-object MicrometerTest extends DefaultRunnableSpec {
+object MicrometerUnsafeTest extends DefaultRunnableSpec {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
   private val env = Clock.live ++ Registry.makeWith(registry)
@@ -47,7 +47,7 @@ object MicrometerTest extends DefaultRunnableSpec {
   } yield g(Seq("get", "users"))
 
   override def spec: ZSpec[Environment, Failure] =
-    suite("MicrometerTest")(
+    suite("MicrometerUnsafeTest")(
       suite("Counter")(
         testM("counter increases by `inc` amount") {
           for {

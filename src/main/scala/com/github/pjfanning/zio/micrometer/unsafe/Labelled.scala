@@ -1,5 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
+import com.github.pjfanning.zio.micrometer.LabelList
 import zio.ZIO
 
 /**
@@ -13,7 +14,7 @@ trait LabelledMetric[R, E, M] {
   def labelled(
     name: String,
     help: Option[String],
-    labels: Seq[String]
+    labelNames: Seq[String]
   ): ZIO[R, E, Seq[String] => M]
 
   def apply(name: String, help: Option[String]): ZIO[R, E, M] =
@@ -37,7 +38,7 @@ trait LabelledMetricP[R, E, P, M] {
     name: String,
     p: P,
     help: Option[String],
-    labels: Seq[String]
+    labelNames: Seq[String]
   ): ZIO[R, E, Seq[String] => M]
 
   def apply(name: String, p: P, help: Option[String]): ZIO[R, E, M] =
@@ -46,9 +47,9 @@ trait LabelledMetricP[R, E, P, M] {
     name: String,
     p: P,
     help: Option[String],
-    labels: L
+    labelNames: L
   ): ZIO[R, E, Labelled[L]] =
-    labelled(name, p, help, labels.toList).map(f => (l: L) => f(l.toList))
+    labelled(name, p, help, labelNames.toList).map(f => (l: L) => f(l.toList))
 
   type Labelled[L <: LabelList] = L => M
 }

@@ -50,7 +50,7 @@ import java.util.function.DoubleUnaryOperator;
  * @author Doug Lea
  * @author Martin Buchholz
  */
-class AtomicDouble extends Number implements java.io.Serializable {
+public class AtomicDouble extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 0L;
 
     private transient volatile long value;
