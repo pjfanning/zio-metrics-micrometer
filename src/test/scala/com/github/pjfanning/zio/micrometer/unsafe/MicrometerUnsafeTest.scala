@@ -5,7 +5,7 @@ import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.Clock
 import zio.test.Assertion._
-import zio.test.{ZSpec, assert}
+import zio.test.assert
 import zio.ZIO
 
 import java.util.concurrent.atomic.AtomicReference

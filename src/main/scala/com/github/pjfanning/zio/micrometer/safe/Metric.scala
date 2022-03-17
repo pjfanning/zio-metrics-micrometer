@@ -25,7 +25,7 @@ object Counter extends LabelledMetric[Registry, Counter] {
             }
           }
         }
-        ZIO.tupledPar(fallbackZio, logZio).map(_._1)
+        fallbackZio.zipPar(logZio)
     }
   }
 }
