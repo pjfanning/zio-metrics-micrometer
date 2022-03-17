@@ -1,4 +1,4 @@
-package com.github.pjfanning.zio.micrometer
+package com.github.pjfanning.zio.micrometer.unsafe
 
 import zio.ZIO
 
@@ -10,16 +10,16 @@ import zio.ZIO
  * values with the same length.
  */
 trait LabelledMetric[R, E, M] {
-  def unsafeLabelled(
+  def labelled(
     name: String,
     help: Option[String],
     labels: Seq[String]
   ): ZIO[R, E, Seq[String] => M]
 
   def apply(name: String, help: Option[String]): ZIO[R, E, M] =
-    unsafeLabelled(name, help, Nil).map(f => f(Nil))
+    labelled(name, help, Nil).map(f => f(Nil))
   def apply[L <: LabelList](name: String, help: Option[String], labels: L): ZIO[R, E, Labelled[L]] =
-    unsafeLabelled(name, help, labels.toList).map(f => (l: L) => f(l.toList))
+    labelled(name, help, labels.toList).map(f => (l: L) => f(l.toList))
 
   type Labelled[L <: LabelList] = L => M
 }
@@ -31,8 +31,9 @@ trait LabelledMetric[R, E, M] {
  * Operations on the metric (increment a counter for instance), require to pass a list of label
  * values with the same length.
  */
+/*
 trait LabelledMetricP[R, E, P, M] {
-  protected[this] def unsafeLabelled(
+  protected[this] def labelled(
     name: String,
     p: P,
     help: Option[String],
@@ -40,14 +41,15 @@ trait LabelledMetricP[R, E, P, M] {
   ): ZIO[R, E, Seq[String] => M]
 
   def apply(name: String, p: P, help: Option[String]): ZIO[R, E, M] =
-    unsafeLabelled(name, p, help, Nil).map(f => f(Nil))
+    labelled(name, p, help, Nil).map(f => f(Nil))
   def apply[L <: LabelList](
     name: String,
     p: P,
     help: Option[String],
     labels: L
   ): ZIO[R, E, Labelled[L]] =
-    unsafeLabelled(name, p, help, labels.toList).map(f => (l: L) => f(l.toList))
+    labelled(name, p, help, labels.toList).map(f => (l: L) => f(l.toList))
 
   type Labelled[L <: LabelList] = L => M
 }
+*/

@@ -1,10 +1,10 @@
-package com.github.pjfanning.zio
+package com.github.pjfanning.zio.micrometer
 
 import java.{util => ju}
 import io.micrometer.core.instrument
 import zio.{Has, RIO, Semaphore, Task, UIO, ULayer, ZIO}
 
-package object micrometer {
+package object unsafe {
   type Registry = Has[Registry.Service]
 
   object Registry {

@@ -9,12 +9,14 @@ ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.1")
 
 val micrometerVersion = "1.8.4"
 val zioVersion        = "1.0.13"
+val zioLoggingVersion = "0.5.9"
 
 lazy val root = (project in file("."))
   .settings(
     name := "zio-metrics-micrometer",
     libraryDependencies ++= Seq(
       "dev.zio"          %% "zio"                            % zioVersion,
+      "dev.zio"          %% "zio-logging"                    % zioLoggingVersion,
       "dev.zio"          %% "zio-test"                       % zioVersion % Test,
       "dev.zio"          %% "zio-test-sbt"                   % zioVersion % Test,
       "io.micrometer"    %  "micrometer-core"                % micrometerVersion,

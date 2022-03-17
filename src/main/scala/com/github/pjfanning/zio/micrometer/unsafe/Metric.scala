@@ -1,26 +1,15 @@
-package com.github.pjfanning.zio.micrometer
+package com.github.pjfanning.zio.micrometer.unsafe
 
+import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import zio._
-import zio.clock._
-import zio.duration.Duration
 
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
-
-trait HasMicrometerMeterId {
-  def getMeterId: UIO[instrument.Meter.Id]
-}
-
-trait Counter {
-  def inc: UIO[Unit] = inc(1)
-  def inc(amount: Double): UIO[Unit]
-  def get: UIO[Double]
-}
 
 private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
                              name: String,
@@ -44,14 +33,14 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
       .register(registry)
   }
 
-  def unsafeLabelled(
+  def labelled(
     name: String,
     help: Option[String],
-    labels: Seq[String]
+    labelNames: Seq[String]
   ): ZIO[Registry, Throwable, Seq[String] => Counter] =
     for {
       counterWrapper <- updateRegistry { r =>
-        ZIO.effect(new CounterWrapper(r, name, help, labels))
+        ZIO.effect(new CounterWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
       new Counter with HasMicrometerMeterId {
@@ -66,6 +55,7 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
     }
 }
 
+/*
 trait Timer {
 
   /** Returns how much time as elapsed since the timer was started. */
@@ -114,18 +104,7 @@ private abstract class TimerMetricImpl(clock: Clock.Service) extends TimerMetric
       }
     }
 }
-
-trait ReadOnlyGauge {
-  def get: UIO[Double]
-}
-
-trait Gauge extends ReadOnlyGauge {
-  def set(value: Double): UIO[Unit]
-  def inc: UIO[Unit] = inc(1)
-  def inc(amount: Double): UIO[Unit]
-  def dec: UIO[Unit] = dec(1)
-  def dec(amount: Double): UIO[Unit]
-}
+*/
 
 private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
                            name: String,
@@ -135,6 +114,31 @@ private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
   def gaugeFor(labelValues: Seq[String]): Gauge = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
     Gauge.getGauge(meterRegistry, name, help, tags)
+  }
+}
+
+private class FunctionGaugeWrapper(meterRegistry: instrument.MeterRegistry,
+                                   name: String,
+                                   help: Option[String],
+                                   labelNames: Seq[String],
+                                   fun: => Double) {
+
+  def gaugeFor(labelValues: Seq[String]): ReadOnlyGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    Gauge.getFunctionGauge(meterRegistry, name, help, tags, fun)
+  }
+}
+
+private class TFunctionGaugeWrapper[T](meterRegistry: instrument.MeterRegistry,
+                                       name: String,
+                                       help: Option[String],
+                                       labelNames: Seq[String],
+                                       t: T,
+                                       fun: T => Double) {
+
+  def gaugeFor(labelValues: Seq[String]): ReadOnlyGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    Gauge.getTFunctionGauge(meterRegistry, name, help, tags, t, fun)
   }
 }
 
@@ -167,69 +171,84 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     })
   }
 
-  def unsafeLabelled(
-    name: String,
-    help: Option[String],
-    labelNames: Seq[String],
-    labelValues: Seq[String],
-    fun: => Double
-  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
-    for {
-      gauge <- updateRegistry { r =>
-        ZIO.effect(
-          instrument.Gauge.builder(name, new Supplier[Number]() {
-            override def get(): Number = fun
-          }).description(help.getOrElse(""))
-            .tags(zipLabelsAsTags(labelNames, labelValues).asJava)
-            .register(r)
-        )
-      }
-    } yield
-      new ReadOnlyGauge with HasMicrometerMeterId {
-        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
-        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
-      }
+  private[micrometer] def getFunctionGauge(registry: instrument.MeterRegistry, name: String,
+                                           help: Option[String], tags: Seq[instrument.Tag],
+                                           fun: => Double): ReadOnlyGauge = {
+    val mGauge = instrument.Gauge
+      .builder(name, new Supplier[Number]() {
+        override def get(): Number = fun
+      })
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+      .register(registry)
+    new ReadOnlyGauge with HasMicrometerMeterId {
+      override def get: UIO[Double]               = ZIO.effectTotal(fun)
+      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+    }
   }
 
-  def unsafeLabelled[T](
+  private[micrometer] def getTFunctionGauge[T](registry: instrument.MeterRegistry, name: String,
+                                               help: Option[String], tags: Seq[instrument.Tag],
+                                               t: T, fun: T => Double): ReadOnlyGauge = {
+    val mGauge = instrument.Gauge
+      .builder(name, new Supplier[Number]() {
+        override def get(): Number = fun(t)
+      })
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+      .register(registry)
+    new ReadOnlyGauge with HasMicrometerMeterId {
+      override def get: UIO[Double]               = ZIO.effectTotal(fun(t))
+      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+    }
+  }
+
+  def labelled(
     name: String,
     help: Option[String],
     labelNames: Seq[String],
-    labelValues: Seq[String],
+    fun: () => Double
+  ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new FunctionGaugeWrapper(r, name, help, labelNames, fun()))
+      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
+  }
+
+  def labelled[T](
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
     t: T,
     fun: T => Double
-  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+  ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
-      gauge <- updateRegistry { r =>
-        ZIO.effect(
-          instrument.Gauge.builder(name, new Supplier[Number]() {
-            override def get(): Number = fun(t)
-          }).description(help.getOrElse(""))
-            .tags(zipLabelsAsTags(labelNames, labelValues).asJava)
-            .register(r)
-        )
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun))
       }
-    } yield
-      new ReadOnlyGauge with HasMicrometerMeterId {
-        override def get: UIO[Double] = ZIO.effectTotal(gauge.value())
-        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(gauge.getId)
-      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
   }
 
-  def unsafeLabelled(
+  def labelled(
     name: String,
     help: Option[String],
-    labels: Seq[String]
+    labelNames: Seq[String]
   ): ZIO[Registry, Throwable, Seq[String] => Gauge] =
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new GaugeWrapper(r, name, help, labels))
+        ZIO.effect(new GaugeWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
     }
 }
 
+/*
 sealed trait Buckets
 object Buckets {
   object Default                                                          extends Buckets
@@ -238,10 +257,9 @@ object Buckets {
   final case class Exponential(start: Double, factor: Double, count: Int) extends Buckets
 }
 
-/*
 trait Histogram extends TimerMetric
 object Histogram extends LabelledMetricP[Registry with Clock, Throwable, Buckets, Histogram] {
-  def unsafeLabelled(
+  def labelled(
     name: String,
     buckets: Buckets,
     help: Option[String],
@@ -273,14 +291,12 @@ object Histogram extends LabelledMetricP[Registry with Clock, Throwable, Buckets
       }
     }
 }
-*/
 
 final case class Quantile(percentile: Double, tolerance: Double)
 
-/*
 trait Summary extends TimerMetric
 object Summary extends LabelledMetricP[Registry with Clock, Throwable, List[Quantile], Summary] {
-  def unsafeLabelled(
+  def labelled(
     name: String,
     quantiles: List[Quantile],
     help: Option[String],

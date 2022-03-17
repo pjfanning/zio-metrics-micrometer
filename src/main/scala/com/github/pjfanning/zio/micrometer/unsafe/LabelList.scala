@@ -1,4 +1,4 @@
-package com.github.pjfanning.zio.micrometer
+package com.github.pjfanning.zio.micrometer.unsafe
 
 /**
  * A list of strings whose size is statically known.
