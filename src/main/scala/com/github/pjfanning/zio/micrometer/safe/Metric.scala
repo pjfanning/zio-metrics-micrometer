@@ -17,7 +17,7 @@ object Counter extends LabelledMetric[Registry with Logging, Counter] {
     UnsafeCounter.labelled(name, help, labelNames).catchAll {
       case NonFatal(t) =>
         val logZio = log.throwable("Issue creating counter", t)
-        val fallbackZio = URIO.effectTotal {
+        val fallbackZio = URIO.succeed {
           (labelValues: Seq[String]) => {
             val atomicDouble = new AtomicDouble()
             new Counter {

@@ -5,12 +5,13 @@ import com.github.pjfanning.zio.micrometer.safe.Counter
 import com.github.pjfanning.zio.micrometer.unsafe.Registry
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.ZIO
-import zio.clock.Clock
+import zio.Clock
 import zio.logging.{LogFormat, LogLevel, Logging}
 import zio.test.Assertion.equalTo
-import zio.test.{DefaultRunnableSpec, ZSpec, assert}
+import zio.test.{ZSpec, assert}
+import zio.test.ZIOSpecDefault
 
-object MicrometerSafeTest extends DefaultRunnableSpec {
+object MicrometerSafeTest extends ZIOSpecDefault {
 
   private val LoggingEnv =
     Logging.console(
@@ -26,8 +27,7 @@ object MicrometerSafeTest extends DefaultRunnableSpec {
     _ <- c(Array("get", "users")).inc(2)
   } yield c(Seq("get", "users"))
 
-  override def spec: ZSpec[Environment, Failure] =
-    suite("MicrometerSafeTest")(
+  override def spec = suite("MicrometerSafeTest")(
       suite("Counter")(
         testM("counter increases by `inc` amount") {
           for {
@@ -36,5 +36,5 @@ object MicrometerSafeTest extends DefaultRunnableSpec {
           } yield assert(counterValue)(equalTo(3.0))
         }
       )
-    ).provideCustomLayer(env)
+    ).provideCustomLayer(env)test
 }
