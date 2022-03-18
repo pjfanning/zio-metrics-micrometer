@@ -44,7 +44,7 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
 
   val tFunctionGaugeHolder = new AtomicReference[Double](10.0)
   val tFunctionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
-    g <- Gauge.labelledFunction[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"),
+    g <- Gauge.labelledTFunction[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"),
       tFunctionGaugeHolder, _.get())
   } yield g(Seq("get", "users"))
 

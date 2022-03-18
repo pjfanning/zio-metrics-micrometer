@@ -497,8 +497,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   def labelledFunction(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String],
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
     fun: () => Double
   ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
@@ -510,7 +510,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
-  def labelledFunction[T](
+  def labelledTFunction[T](
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
