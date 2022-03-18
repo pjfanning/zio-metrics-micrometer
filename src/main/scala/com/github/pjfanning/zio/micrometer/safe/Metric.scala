@@ -11,8 +11,8 @@ object Counter extends LabelledMetric[Registry with Logging, Counter] {
 
   def labelled(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String]
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty
   ): URIO[Registry with Logging, Seq[String] => Counter] = {
     UnsafeCounter.labelled(name, help, labelNames).catchAll {
       case NonFatal(t) =>

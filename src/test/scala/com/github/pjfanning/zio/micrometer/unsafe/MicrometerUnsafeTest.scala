@@ -38,12 +38,14 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
 
   val functionGaugeHolder = new AtomicReference[Double](10.0)
   val functionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
-    g <- Gauge.labelled("simple_gauge", None, Array("method", "resource"), () => functionGaugeHolder.get())
+    g <- Gauge.labelledFunction("simple_gauge", None, Array("method", "resource"),
+      () => functionGaugeHolder.get())
   } yield g(Seq("get", "users"))
 
   val tFunctionGaugeHolder = new AtomicReference[Double](10.0)
   val tFunctionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
-    g <- Gauge.labelled[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"), tFunctionGaugeHolder, _.get())
+    g <- Gauge.labelledFunction[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"),
+      tFunctionGaugeHolder, _.get())
   } yield g(Seq("get", "users"))
 
   override def spec: ZSpec[Environment, Failure] =

@@ -39,8 +39,8 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
 
   def labelled(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String]
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty
   ): ZIO[Registry, Throwable, Seq[String] => Counter] =
     for {
       counterWrapper <- updateRegistry { r =>
@@ -495,7 +495,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
-  def labelled(
+  def labelledFunction(
     name: String,
     help: Option[String],
     labelNames: Seq[String],
@@ -510,7 +510,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
-  def labelled[T](
+  def labelledFunction[T](
     name: String,
     help: Option[String],
     labelNames: Seq[String],
@@ -529,8 +529,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   def labelled(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String]
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty
   ): ZIO[Registry, Throwable, Seq[String] => Gauge] =
     for {
       gaugeWrapper <- updateRegistry { r =>
