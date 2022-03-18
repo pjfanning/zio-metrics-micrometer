@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, ReadOnlyGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
@@ -206,6 +206,17 @@ private class TimerWrapper(meterRegistry: instrument.MeterRegistry,
       pauseDetector = pauseDetector
     )
   }
+
+  def longTaskTimerFor(labelValues: Seq[String]): LongTaskTimer = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    Timer.getLongTaskTimer(meterRegistry, name, help, tags,
+      minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+      serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+      distributionStatisticBufferLength = distributionStatisticBufferLength, publishPercentiles = publishPercentiles,
+      publishPercentileHistogram = publishPercentileHistogram, percentilePrecision = percentilePrecision
+    )
+  }
+
 }
 
 object Timer extends LabelledMetric[Registry, Throwable, Timer] {
@@ -277,12 +288,97 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
     }
   }
 
+  private[micrometer] def getLongTaskTimer(registry: instrument.MeterRegistry, name: String,
+                                           help: Option[String], tags: Seq[instrument.Tag],
+                                           minimumExpectedValue: Option[FiniteDuration] = None,
+                                           maximumExpectedValue: Option[FiniteDuration] = None,
+                                           serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+                                           distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                           distributionStatisticBufferLength: Option[Int] = None,
+                                           publishPercentiles: Seq[Double] = Seq.empty,
+                                           publishPercentileHistogram: Option[Boolean] = None,
+                                           percentilePrecision: Option[Int] = None): LongTaskTimer = {
+    val builder = instrument.LongTaskTimer
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+    minimumExpectedValue match {
+      case Some(min) => builder.minimumExpectedValue(toJava(min))
+      case _ =>
+    }
+    maximumExpectedValue match {
+      case Some(max) => builder.maximumExpectedValue(toJava(max))
+      case _ =>
+    }
+    if (serviceLevelObjectives.nonEmpty) {
+      builder.serviceLevelObjectives(serviceLevelObjectives.map(toJava): _*)
+    }
+    distributionStatisticExpiry match {
+      case Some(exp) => builder.distributionStatisticExpiry(toJava(exp))
+      case _ =>
+    }
+    distributionStatisticBufferLength match {
+      case Some(len) => builder.distributionStatisticBufferLength(len)
+      case _ =>
+    }
+    if (publishPercentiles.nonEmpty) builder.publishPercentiles(publishPercentiles: _*)
+    publishPercentileHistogram match {
+      case Some(bool) => builder.publishPercentileHistogram(bool)
+      case _ =>
+    }
+    percentilePrecision match {
+      case Some(len) => builder.percentilePrecision(len)
+      case _ =>
+    }
+    val timer = builder.register(registry)
+    new LongTaskTimer with HasMicrometerMeterId {
+      override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(timer.baseTimeUnit())
+      override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(timer.duration(timeUnit))
+      override def max(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(timer.max(timeUnit))
+      override def mean(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(timer.mean(timeUnit))
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(timer.getId)
+
+      override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
+        val sample = timer.start()
+        new TimerSample {
+          override def stop(): UIO[Unit] = ZIO.effectTotal(sample.stop())
+        }
+      }
+    }
+  }
+
   override def labelled(
      name: String,
      help: Option[String],
      labelNames: Seq[String]
    ): ZIO[Registry, Throwable, Seq[String] => Timer] =
     labelledWithOptions(name, help, labelNames)
+
+  def labelledLongTaskTimer(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None
+  ): ZIO[Registry, Throwable, Seq[String] => LongTaskTimer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.effect(new TimerWrapper(r, name = name, help = help, labelNames = labelNames,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+      timerWrapper.longTaskTimerFor(labelValues)
 
   def labelledWithOptions(
     name: String,
@@ -340,11 +436,12 @@ private class TFunctionGaugeWrapper[T](meterRegistry: instrument.MeterRegistry,
                                        help: Option[String],
                                        labelNames: Seq[String],
                                        t: T,
-                                       fun: T => Double) {
+                                       fun: T => Double,
+                                       strongReference: Boolean = false) {
 
   def gaugeFor(labelValues: Seq[String]): ReadOnlyGauge = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
-    Gauge.getTFunctionGauge(meterRegistry, name, help, tags, t, fun)
+    Gauge.getTFunctionGauge(meterRegistry, name, help, tags, t, fun, strongReference)
   }
 }
 
@@ -395,13 +492,14 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   private[micrometer] def getTFunctionGauge[T](registry: instrument.MeterRegistry, name: String,
                                                help: Option[String], tags: Seq[instrument.Tag],
-                                               t: T, fun: T => Double): ReadOnlyGauge = {
+                                               t: T, fun: T => Double, strongReference: Boolean = false): ReadOnlyGauge = {
     val mGauge = instrument.Gauge
       .builder(name, new Supplier[Number]() {
         override def get(): Number = fun(t)
       })
       .description(help.getOrElse(""))
       .tags(tags.asJava)
+      .strongReference(strongReference)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
       override def get: UIO[Double]               = ZIO.effectTotal(fun(t))
@@ -429,11 +527,12 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     help: Option[String],
     labelNames: Seq[String],
     t: T,
-    fun: T => Double
+    fun: T => Double,
+    strongReference: Boolean = false
   ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.effect(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun))
+        ZIO.effect(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun, strongReference))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
