@@ -1,14 +1,16 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.clock.Clock
+import zio.duration.Duration
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, ZSpec, assert}
-import zio.ZIO
+import zio.{Has, ZIO}
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.duration.NANOSECONDS
 import scala.util.Random
 
 object MicrometerUnsafeTest extends DefaultRunnableSpec {
@@ -46,6 +48,13 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
   val tFunctionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
     g <- Gauge.labelledTFunction[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"),
       tFunctionGaugeHolder, _.get())
+  } yield g(Seq("get", "users"))
+
+  val timeGaugeTestZIO: ZIO[Registry with Clock, Throwable, TimeGauge] = for {
+    g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
+    timer <- g(Array("get", "users")).startTimerSample()
+    _ <- ZIO.sleep(Duration.fromMillis(250))
+    _ <- timer.stop()
   } yield g(Seq("get", "users"))
 
   override def spec: ZSpec[Environment, Failure] =
@@ -91,6 +100,14 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
             gauge <- tFunctionGaugeTestZIO
             gaugeValue <- gauge.get
           } yield assert(gaugeValue)(equalTo(tFunctionGaugeHolder.get()))
+        }
+      ),
+      suite("TimeGauge")(
+        testM("gauge applies timer") {
+          for {
+            gauge <- timeGaugeTestZIO
+            gaugeValue <- gauge.totalTime(NANOSECONDS)
+          } yield assert(gaugeValue)(isGreaterThanEqualTo(150.0))
         }
       )
     ).provideCustomLayer(env)

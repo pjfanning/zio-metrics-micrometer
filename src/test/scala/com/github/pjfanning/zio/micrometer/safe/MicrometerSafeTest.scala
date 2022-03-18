@@ -1,7 +1,6 @@
 package com.github.pjfanning.zio.micrometer.safe
 
 import com.github.pjfanning.zio.micrometer.Counter
-import com.github.pjfanning.zio.micrometer.safe.Counter
 import com.github.pjfanning.zio.micrometer.unsafe.Registry
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.ZIO
