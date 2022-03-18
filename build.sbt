@@ -15,12 +15,13 @@ lazy val root = (project in file("."))
   .settings(
     name := "zio-metrics-micrometer",
     libraryDependencies ++= Seq(
-      "dev.zio"              %% "zio"                            % zioVersion,
-      "dev.zio"              %% "zio-logging"                    % zioLoggingVersion,
-      "dev.zio"              %% "zio-test"                       % zioVersion % Test,
-      "dev.zio"              %% "zio-test-sbt"                   % zioVersion % Test,
-      "io.micrometer"        %  "micrometer-core"                % micrometerVersion,
-      "io.micrometer"        %  "micrometer-registry-prometheus" % micrometerVersion % Test
+      "org.scala-lang.modules" %% "scala-java8-compat"             % "0.9.0",
+      "dev.zio"                %% "zio"                            % zioVersion,
+      "dev.zio"                %% "zio-logging"                    % zioLoggingVersion,
+      "dev.zio"                %% "zio-test"                       % zioVersion % Test,
+      "dev.zio"                %% "zio-test-sbt"                   % zioVersion % Test,
+      "io.micrometer"          %  "micrometer-core"                % micrometerVersion,
+      "io.micrometer"          %  "micrometer-registry-prometheus" % micrometerVersion % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )

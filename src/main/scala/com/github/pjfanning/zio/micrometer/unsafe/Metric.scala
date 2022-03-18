@@ -8,7 +8,8 @@ import zio._
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.Duration
+import scala.compat.java8.DurationConverters._
+import scala.concurrent.duration.FiniteDuration
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -64,8 +65,8 @@ private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry
                                          minimumExpectedValue: Option[Double] = None,
                                          maximumExpectedValue: Option[Double] = None,
                                          serviceLevelObjectives: Seq[Double] = Seq.empty,
-                                         distributionStatisticExpiry: Option[Duration] = None,
-                                         distributionStatisticBufferLength: Option[Long] = None,
+                                         distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                         distributionStatisticBufferLength: Option[Int] = None,
                                          publishPercentiles: Seq[Double] = Seq.empty,
                                          publishPercentileHistogram: Option[Boolean] = None,
                                          percentilePrecision: Option[Int] = None,
@@ -80,12 +81,53 @@ private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry
 object DistributionSummary extends LabelledMetric[Registry, Throwable, DistributionSummary] {
 
   private[micrometer] def getDistributionSummary(registry: instrument.MeterRegistry, name: String,
-                                                 help: Option[String], tags: Seq[instrument.Tag]): DistributionSummary = {
-    val ds = instrument.DistributionSummary
+                                                 help: Option[String], tags: Seq[instrument.Tag],
+                                                 scale: Double = 1.0,
+                                                 minimumExpectedValue: Option[Double] = None,
+                                                 maximumExpectedValue: Option[Double] = None,
+                                                 serviceLevelObjectives: Seq[Double] = Seq.empty,
+                                                 distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                                 distributionStatisticBufferLength: Option[Int] = None,
+                                                 publishPercentiles: Seq[Double] = Seq.empty,
+                                                 publishPercentileHistogram: Option[Boolean] = None,
+                                                 percentilePrecision: Option[Int] = None,
+                                                 baseUnit: Option[String] = None): DistributionSummary = {
+    val dsBuilder = instrument.DistributionSummary
       .builder(name)
       .description(help.getOrElse(""))
       .tags(tags.asJava)
-      .register(registry)
+      .scale(scale)
+    minimumExpectedValue match {
+      case Some(min) => dsBuilder.minimumExpectedValue(min)
+      case _ =>
+    }
+    maximumExpectedValue match {
+      case Some(max) => dsBuilder.maximumExpectedValue(max)
+      case _ =>
+    }
+    if (!serviceLevelObjectives.isEmpty) dsBuilder.serviceLevelObjectives(serviceLevelObjectives: _*)
+    distributionStatisticExpiry match {
+      case Some(exp) => dsBuilder.distributionStatisticExpiry(toJava(exp))
+      case _ =>
+    }
+    distributionStatisticBufferLength match {
+      case Some(len) => dsBuilder.distributionStatisticBufferLength(len)
+      case _ =>
+    }
+    if (!publishPercentiles.isEmpty) dsBuilder.publishPercentiles(publishPercentiles: _*)
+    publishPercentileHistogram match {
+      case Some(bool) => dsBuilder.publishPercentileHistogram(bool)
+      case _ =>
+    }
+    percentilePrecision match {
+      case Some(len) => dsBuilder.percentilePrecision(len)
+      case _ =>
+    }
+    baseUnit match {
+      case Some(unit) => dsBuilder.baseUnit(unit)
+      case _ =>
+    }
+    val ds = dsBuilder.register(registry)
     new DistributionSummary with HasMicrometerMeterId {
       override def count: UIO[Double] = ZIO.effectTotal(ds.count())
       override def totalAmount: UIO[Double] = ZIO.effectTotal(ds.totalAmount())
@@ -111,8 +153,8 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
     minimumExpectedValue: Option[Double] = None,
     maximumExpectedValue: Option[Double] = None,
     serviceLevelObjectives: Seq[Double] = Seq.empty,
-    distributionStatisticExpiry: Option[Duration] = None,
-    distributionStatisticBufferLength: Option[Long] = None,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
     publishPercentiles: Seq[Double] = Seq.empty,
     publishPercentileHistogram: Option[Boolean] = None,
     percentilePrecision: Option[Int] = None,
