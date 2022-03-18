@@ -31,7 +31,7 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
                                      help: Option[String], tags: Seq[instrument.Tag]): instrument.Counter = {
     instrument.Counter
       .builder(name)
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
       .register(registry)
   }
@@ -101,7 +101,7 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
                                                  baseUnit: Option[String] = None): DistributionSummary = {
     val dsBuilder = instrument.DistributionSummary
       .builder(name)
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
       .scale(scale)
     minimumExpectedValue match {
@@ -233,7 +233,7 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
                                    pauseDetector: Option[PauseDetector] = None): Timer = {
     val builder = instrument.Timer
       .builder(name)
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
     minimumExpectedValue match {
       case Some(min) => builder.minimumExpectedValue(toJava(min))
@@ -299,7 +299,7 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
                                            percentilePrecision: Option[Int] = None): LongTaskTimer = {
     val builder = instrument.LongTaskTimer
       .builder(name)
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
     minimumExpectedValue match {
       case Some(min) => builder.minimumExpectedValue(toJava(min))
@@ -460,7 +460,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         .builder(name, new Supplier[Number]() {
           override def get(): Number = atomicDouble.get()
         })
-        .description(help.getOrElse(""))
+        .description(help.orNull)
         .tags(tags.asJava)
         .register(registry)
       new Gauge with HasMicrometerMeterId {
@@ -480,7 +480,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .builder(name, new Supplier[Number]() {
         override def get(): Number = fun
       })
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
@@ -496,7 +496,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .builder(name, new Supplier[Number]() {
         override def get(): Number = fun(t)
       })
-      .description(help.getOrElse(""))
+      .description(help.orNull)
       .tags(tags.asJava)
       .strongReference(strongReference)
       .register(registry)
