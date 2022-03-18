@@ -3,10 +3,9 @@ package com.github.pjfanning.zio.micrometer.unsafe
 import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
-import zio.Clock
+import zio.{Clock, ZIO}
 import zio.test.Assertion._
-import zio.test.assert
-import zio.ZIO
+import zio.test.{ZSpec, assert}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Random
@@ -39,12 +38,14 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   val functionGaugeHolder = new AtomicReference[Double](10.0)
   val functionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
-    g <- Gauge.labelled("simple_gauge", None, Array("method", "resource"), () => functionGaugeHolder.get())
+    g <- Gauge.labelledFunction("simple_gauge", None, Array("method", "resource"),
+      () => functionGaugeHolder.get())
   } yield g(Seq("get", "users"))
 
   val tFunctionGaugeHolder = new AtomicReference[Double](10.0)
   val tFunctionGaugeTestZIO: ZIO[Registry, Throwable, ReadOnlyGauge] = for {
-    g <- Gauge.labelled[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"), tFunctionGaugeHolder, _.get())
+    g <- Gauge.labelledTFunction[AtomicReference[Double]]("simple_gauge", None, Array("method", "resource"),
+      tFunctionGaugeHolder, _.get())
   } yield g(Seq("get", "users"))
 
   override def spec = suite("MicrometerUnsafeTest")(

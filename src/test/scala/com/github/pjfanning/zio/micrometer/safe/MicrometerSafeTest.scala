@@ -3,8 +3,7 @@ package com.github.pjfanning.zio.micrometer.safe
 import com.github.pjfanning.zio.micrometer.Counter
 import com.github.pjfanning.zio.micrometer.unsafe.Registry
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
-import zio.ZIO
-import zio.Clock
+import zio.{Clock, ZIO}
 import zio.test.Assertion.equalTo
 import zio.test.{ZIOSpecDefault, assert}
 
