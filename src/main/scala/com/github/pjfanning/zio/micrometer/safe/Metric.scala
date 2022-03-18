@@ -2,7 +2,7 @@ package com.github.pjfanning.zio.micrometer.safe
 
 import com.github.pjfanning.zio.micrometer.Counter
 import com.github.pjfanning.zio.micrometer.unsafe.{AtomicDouble, Registry, Counter => UnsafeCounter}
-import zio.{UIO, URIO, ZIO}
+import zio.{UIO, URIO}
 import zio.logging._
 
 import scala.util.control.NonFatal

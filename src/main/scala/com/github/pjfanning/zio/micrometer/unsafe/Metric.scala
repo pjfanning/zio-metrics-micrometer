@@ -146,14 +146,7 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
     }
   }
 
-  override def labelled(
-     name: String,
-     help: Option[String],
-     labelNames: Seq[String]
-   ): ZIO[Registry, Throwable, Seq[String] => DistributionSummary] =
-    labelledWithOptions(name, help, labelNames)
-
-  def labelledWithOptions(
+  def labelled(
     name: String,
     help: Option[String],
     labelNames: Seq[String],
@@ -347,12 +340,33 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
     }
   }
 
-  override def labelled(
-     name: String,
-     help: Option[String],
-     labelNames: Seq[String]
-   ): ZIO[Registry, Throwable, Seq[String] => Timer] =
-    labelledWithOptions(name, help, labelNames)
+  def labelled(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    pauseDetector: Option[PauseDetector] = None
+  ): ZIO[Registry, Throwable, Seq[String] => Timer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.effect(new TimerWrapper(r, name = name, help = help, labelNames = labelNames,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, pauseDetector = pauseDetector
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+      timerWrapper.timerFor(labelValues)
+
 
   def labelledLongTaskTimer(
     name: String,
@@ -380,32 +394,6 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
     } yield (labelValues: Seq[String]) =>
       timerWrapper.longTaskTimerFor(labelValues)
 
-  def labelledWithOptions(
-    name: String,
-    help: Option[String],
-    labelNames: Seq[String],
-    minimumExpectedValue: Option[FiniteDuration] = None,
-    maximumExpectedValue: Option[FiniteDuration] = None,
-    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
-    distributionStatisticExpiry: Option[FiniteDuration] = None,
-    distributionStatisticBufferLength: Option[Int] = None,
-    publishPercentiles: Seq[Double] = Seq.empty,
-    publishPercentileHistogram: Option[Boolean] = None,
-    percentilePrecision: Option[Int] = None,
-    pauseDetector: Option[PauseDetector] = None
-  ): ZIO[Registry, Throwable, Seq[String] => Timer] =
-    for {
-      timerWrapper <- updateRegistry { r =>
-        ZIO.effect(new TimerWrapper(r, name = name, help = help, labelNames = labelNames,
-          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
-          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
-          distributionStatisticBufferLength = distributionStatisticBufferLength,
-          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
-          percentilePrecision = percentilePrecision, pauseDetector = pauseDetector
-        ))
-      }
-    } yield (labelValues: Seq[String]) =>
-      timerWrapper.timerFor(labelValues)
 }
 
 private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
