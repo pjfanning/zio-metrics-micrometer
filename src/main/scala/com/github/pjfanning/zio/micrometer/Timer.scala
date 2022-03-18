@@ -1,7 +1,7 @@
 package com.github.pjfanning.zio.micrometer
 
 import zio.UIO
-import zio.duration.Duration
+import zio.Duration
 
 import scala.concurrent.duration.{FiniteDuration, TimeUnit}
 
