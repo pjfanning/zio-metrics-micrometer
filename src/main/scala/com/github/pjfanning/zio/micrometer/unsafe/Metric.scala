@@ -5,13 +5,14 @@ import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
 import zio._
+import zio.clock.Clock
 import zio.duration.Duration
 
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -539,4 +540,40 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
     }
+
+  object TimeGauge extends LabelledMetric[Registry, Throwable, LongTaskTimer] {
+
+    private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, LongTaskTimer]]()
+
+    private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, LongTaskTimer] = {
+      gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, LongTaskTimer]())
+    }
+
+    private[micrometer] def getGauge(clock: Clock.Service, registry: instrument.MeterRegistry, name: String,
+                                     help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): LongTaskTimer = {
+      gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
+        val atomicDouble = new AtomicDouble()
+        val mGauge = instrument.TimeGauge
+          .builder(name, new Supplier[Number]() {
+            override def get(): Number = atomicDouble.get()
+          }, timeUnit)
+          .description(help.orNull)
+          .tags(tags.asJava)
+          .register(registry)
+        new LongTaskTimer with HasMicrometerMeterId {
+          override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
+          override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(mGauge.baseTimeUnit())
+          override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(mGauge.value(timeUnit))
+          override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
+            new TimerSample {
+              val startTime = clock.currentTime(mGauge.baseTimeUnit())
+              override def stop(): UIO[Unit] = ZIO.effectTotal {
+                atomicDouble.addAndGet( - startTime)
+              }
+            }
+          }
+        }
+      })
+    }
+  }
 }
