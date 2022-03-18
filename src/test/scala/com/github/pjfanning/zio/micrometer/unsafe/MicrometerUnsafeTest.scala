@@ -3,15 +3,16 @@ package com.github.pjfanning.zio.micrometer.unsafe
 import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
-import zio.clock.Clock
+import zio.Clock
 import zio.test.Assertion._
-import zio.test.{DefaultRunnableSpec, ZSpec, assert}
+import zio.test.{ZSpec, assert}
 import zio.ZIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Random
+import zio.test.ZIOSpecDefault
 
-object MicrometerUnsafeTest extends DefaultRunnableSpec {
+object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
   private val env = Clock.live ++ Registry.makeWith(registry)
@@ -48,8 +49,7 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
       tFunctionGaugeHolder, _.get())
   } yield g(Seq("get", "users"))
 
-  override def spec: ZSpec[Environment, Failure] =
-    suite("MicrometerUnsafeTest")(
+  override def spec = suite("MicrometerUnsafeTest")(
       suite("Counter")(
         testM("counter increases by `inc` amount") {
           for {
@@ -93,5 +93,5 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
           } yield assert(gaugeValue)(equalTo(tFunctionGaugeHolder.get()))
         }
       )
-    ).provideCustomLayer(env)
+    ).provideCustomLayer(env)testtesttesttesttest
 }
