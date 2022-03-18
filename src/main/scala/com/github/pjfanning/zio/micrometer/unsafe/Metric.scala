@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, TimeGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
@@ -12,7 +12,7 @@ import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -541,16 +541,16 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       gaugeWrapper.gaugeFor(labelValues)
     }
 
-  object TimeGauge extends LabelledMetric[Registry, Throwable, LongTaskTimer] {
+  object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
 
-    private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, LongTaskTimer]]()
+    private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, TimeGauge]]()
 
-    private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, LongTaskTimer] = {
-      gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, LongTaskTimer]())
+    private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, TimeGauge] = {
+      gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, TimeGauge]())
     }
 
     private[micrometer] def getGauge(clock: Clock.Service, registry: instrument.MeterRegistry, name: String,
-                                     help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): LongTaskTimer = {
+                                     help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): TimeGauge = {
       gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
         val atomicDouble = new AtomicDouble()
         val mGauge = instrument.TimeGauge
@@ -560,16 +560,23 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
           .description(help.orNull)
           .tags(tags.asJava)
           .register(registry)
-        new LongTaskTimer with HasMicrometerMeterId {
+        new TimeGauge with HasMicrometerMeterId {
           override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
           override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(mGauge.baseTimeUnit())
           override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(mGauge.value(timeUnit))
+          override def record(duration: Duration): UIO[Unit] = ZIO.effectTotal {
+            val convertedDuration = toScala(duration).toUnit(mGauge.baseTimeUnit())
+            atomicDouble.addAndGet(convertedDuration)
+          }
+          override def record(duration: FiniteDuration): UIO[Unit] = ZIO.effectTotal {
+            atomicDouble.addAndGet(duration.toUnit(mGauge.baseTimeUnit()))
+          }
           override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
             new TimerSample {
-              val startTime = clock.currentTime(mGauge.baseTimeUnit())
-              override def stop(): UIO[Unit] = ZIO.effectTotal {
-                atomicDouble.addAndGet( - startTime)
-              }
+              val startTime = Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+              override def stop(): UIO[Unit] = for {
+                endTime <- clock.currentTime(mGauge.baseTimeUnit())
+              } yield atomicDouble.addAndGet(endTime - startTime)
             }
           }
         }
