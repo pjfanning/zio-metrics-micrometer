@@ -1,13 +1,16 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
+import io.micrometer.core.instrument.distribution.pause.PauseDetector
 import zio._
 
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
+import scala.compat.java8.DurationConverters._
+import scala.concurrent.duration.{FiniteDuration, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -55,56 +58,354 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
     }
 }
 
-/*
-trait Timer {
+private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry,
+                                         name: String,
+                                         help: Option[String],
+                                         labelNames: Seq[String],
+                                         scale: Double = 1.0,
+                                         minimumExpectedValue: Option[Double] = None,
+                                         maximumExpectedValue: Option[Double] = None,
+                                         serviceLevelObjectives: Seq[Double] = Seq.empty,
+                                         distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                         distributionStatisticBufferLength: Option[Int] = None,
+                                         publishPercentiles: Seq[Double] = Seq.empty,
+                                         publishPercentileHistogram: Option[Boolean] = None,
+                                         percentilePrecision: Option[Int] = None,
+                                         baseUnit: Option[String] = None) {
 
-  /** Returns how much time as elapsed since the timer was started. */
-  def elapsed: UIO[Duration]
-
-  /**
-   * Records the duration since the timer was started in the associated metric and returns that
-   * duration.
-   */
-  def stop: UIO[Duration]
+  def summaryFor(labelValues: Seq[String]): DistributionSummary = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    DistributionSummary.getDistributionSummary(meterRegistry, name, help, tags, scale = scale,
+      minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+      serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+      distributionStatisticBufferLength = distributionStatisticBufferLength, publishPercentiles = publishPercentiles,
+      publishPercentileHistogram = publishPercentileHistogram, percentilePrecision = percentilePrecision,
+      baseUnit = baseUnit
+    )
+  }
 }
 
-trait TimerMetric {
+object DistributionSummary extends LabelledMetric[Registry, Throwable, DistributionSummary] {
 
-  /** Starts a timer. When the timer is stopped, the duration is recorded in the metric. */
-  def startTimer: UIO[Timer]
+  private[micrometer] def getDistributionSummary(registry: instrument.MeterRegistry, name: String,
+                                                 help: Option[String], tags: Seq[instrument.Tag],
+                                                 scale: Double = 1.0,
+                                                 minimumExpectedValue: Option[Double] = None,
+                                                 maximumExpectedValue: Option[Double] = None,
+                                                 serviceLevelObjectives: Seq[Double] = Seq.empty,
+                                                 distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                                 distributionStatisticBufferLength: Option[Int] = None,
+                                                 publishPercentiles: Seq[Double] = Seq.empty,
+                                                 publishPercentileHistogram: Option[Boolean] = None,
+                                                 percentilePrecision: Option[Int] = None,
+                                                 baseUnit: Option[String] = None): DistributionSummary = {
+    val dsBuilder = instrument.DistributionSummary
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+      .scale(scale)
+    minimumExpectedValue match {
+      case Some(min) => dsBuilder.minimumExpectedValue(min)
+      case _ =>
+    }
+    maximumExpectedValue match {
+      case Some(max) => dsBuilder.maximumExpectedValue(max)
+      case _ =>
+    }
+    if (serviceLevelObjectives.nonEmpty) dsBuilder.serviceLevelObjectives(serviceLevelObjectives: _*)
+    distributionStatisticExpiry match {
+      case Some(exp) => dsBuilder.distributionStatisticExpiry(toJava(exp))
+      case _ =>
+    }
+    distributionStatisticBufferLength match {
+      case Some(len) => dsBuilder.distributionStatisticBufferLength(len)
+      case _ =>
+    }
+    if (publishPercentiles.nonEmpty) dsBuilder.publishPercentiles(publishPercentiles: _*)
+    publishPercentileHistogram match {
+      case Some(bool) => dsBuilder.publishPercentileHistogram(bool)
+      case _ =>
+    }
+    percentilePrecision match {
+      case Some(len) => dsBuilder.percentilePrecision(len)
+      case _ =>
+    }
+    baseUnit match {
+      case Some(unit) => dsBuilder.baseUnit(unit)
+      case _ =>
+    }
+    val ds = dsBuilder.register(registry)
+    new DistributionSummary with HasMicrometerMeterId {
+      override def count: UIO[Double] = ZIO.succeed(ds.count())
+      override def totalAmount: UIO[Double] = ZIO.succeed(ds.totalAmount())
+      override def max: UIO[Double] = ZIO.succeed(ds.max())
+      override def mean: UIO[Double] = ZIO.succeed(ds.mean())
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(ds.getId)
+      override def record(value: Double): UIO[Unit] = ZIO.succeed(ds.record(value))
+    }
+  }
 
-  /** A managed timer resource. */
-  def timer: UManaged[Timer] = startTimer.toManaged(_.stop)
+  override def labelled(
+     name: String,
+     help: Option[String],
+     labelNames: Seq[String]
+   ): ZIO[Registry, Throwable, Seq[String] => DistributionSummary] =
+    labelledWithOptions(name, help, labelNames)
 
-  /** Runs the given effect and records in the metric how much time it took to succeed or fail. */
-  def observe[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = timer.use(_ => zio)
-
-  /**
-   * Runs the given effect and records in the metric how much time it took to succeed. Do not
-   * record failures.
-   */
-  def observeSuccess[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] =
+  def labelledWithOptions(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    scale: Double = 1.0,
+    minimumExpectedValue: Option[Double] = None,
+    maximumExpectedValue: Option[Double] = None,
+    serviceLevelObjectives: Seq[Double] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    baseUnit: Option[String] = None
+  ): ZIO[Registry, Throwable, Seq[String] => DistributionSummary] =
     for {
-      timer <- startTimer
-      a     <- zio
-      _     <- timer.stop
-    } yield a
-
-  def observe(amount: Duration): UIO[Unit]
+      summaryWrapper <- updateRegistry { r =>
+        ZIO.attempt(new DistributionSummaryWrapper(r, name = name, help = help, labelNames = labelNames,
+          scale = scale, minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, baseUnit = baseUnit
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+        summaryWrapper.summaryFor(labelValues)
 }
 
-private abstract class TimerMetricImpl(clock: Clock.Service) extends TimerMetric {
-  override def startTimer: UIO[Timer] =
-    clock.instant.map { startTime =>
-      new Timer {
-        def elapsed: zio.UIO[Duration] =
-          clock.instant.map(Duration.fromInterval(startTime, _))
-        def stop: zio.UIO[Duration] =
-          elapsed.tap(observe)
+private class TimerWrapper(meterRegistry: instrument.MeterRegistry,
+                           name: String,
+                           help: Option[String],
+                           labelNames: Seq[String],
+                           minimumExpectedValue: Option[FiniteDuration] = None,
+                           maximumExpectedValue: Option[FiniteDuration] = None,
+                           serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+                           distributionStatisticExpiry: Option[FiniteDuration] = None,
+                           distributionStatisticBufferLength: Option[Int] = None,
+                           publishPercentiles: Seq[Double] = Seq.empty,
+                           publishPercentileHistogram: Option[Boolean] = None,
+                           percentilePrecision: Option[Int] = None,
+                           pauseDetector: Option[PauseDetector] = None) {
+
+  def timerFor(labelValues: Seq[String]): Timer = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    Timer.getTimer(meterRegistry, name, help, tags,
+      minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+      serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+      distributionStatisticBufferLength = distributionStatisticBufferLength, publishPercentiles = publishPercentiles,
+      publishPercentileHistogram = publishPercentileHistogram, percentilePrecision = percentilePrecision,
+      pauseDetector = pauseDetector
+    )
+  }
+
+  def longTaskTimerFor(labelValues: Seq[String]): LongTaskTimer = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    Timer.getLongTaskTimer(meterRegistry, name, help, tags,
+      minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+      serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+      distributionStatisticBufferLength = distributionStatisticBufferLength, publishPercentiles = publishPercentiles,
+      publishPercentileHistogram = publishPercentileHistogram, percentilePrecision = percentilePrecision
+    )
+  }
+
+}
+
+object Timer extends LabelledMetric[Registry, Throwable, Timer] {
+
+  private[micrometer] def getTimer(registry: instrument.MeterRegistry, name: String,
+                                   help: Option[String], tags: Seq[instrument.Tag],
+                                   minimumExpectedValue: Option[FiniteDuration] = None,
+                                   maximumExpectedValue: Option[FiniteDuration] = None,
+                                   serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+                                   distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                   distributionStatisticBufferLength: Option[Int] = None,
+                                   publishPercentiles: Seq[Double] = Seq.empty,
+                                   publishPercentileHistogram: Option[Boolean] = None,
+                                   percentilePrecision: Option[Int] = None,
+                                   pauseDetector: Option[PauseDetector] = None): Timer = {
+    val builder = instrument.Timer
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+    minimumExpectedValue match {
+      case Some(min) => builder.minimumExpectedValue(toJava(min))
+      case _ =>
+    }
+    maximumExpectedValue match {
+      case Some(max) => builder.maximumExpectedValue(toJava(max))
+      case _ =>
+    }
+    if (serviceLevelObjectives.nonEmpty) {
+      builder.serviceLevelObjectives(serviceLevelObjectives.map(toJava): _*)
+    }
+    distributionStatisticExpiry match {
+      case Some(exp) => builder.distributionStatisticExpiry(toJava(exp))
+      case _ =>
+    }
+    distributionStatisticBufferLength match {
+      case Some(len) => builder.distributionStatisticBufferLength(len)
+      case _ =>
+    }
+    if (publishPercentiles.nonEmpty) builder.publishPercentiles(publishPercentiles: _*)
+    publishPercentileHistogram match {
+      case Some(bool) => builder.publishPercentileHistogram(bool)
+      case _ =>
+    }
+    percentilePrecision match {
+      case Some(len) => builder.percentilePrecision(len)
+      case _ =>
+    }
+    pauseDetector match {
+      case Some(detector) => builder.pauseDetector(detector)
+      case _ =>
+    }
+    val timer = builder.register(registry)
+    new Timer with HasMicrometerMeterId {
+      override def baseTimeUnit: UIO[TimeUnit] = ZIO.succeed(timer.baseTimeUnit())
+      override def count: UIO[Double] = ZIO.succeed(timer.count())
+      override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.totalTime(timeUnit))
+      override def max(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.max(timeUnit))
+      override def mean(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.mean(timeUnit))
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(timer.getId)
+      override def record(duration: Duration): UIO[Unit] = ZIO.succeed(timer.record(duration))
+      override def record(duration: FiniteDuration): UIO[Unit] = ZIO.succeed(timer.record(toJava(duration)))
+
+      override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
+        val sample = instrument.Timer.start()
+        new TimerSample {
+          override def stop(): UIO[Unit] = ZIO.succeed(sample.stop(timer))
+        }
       }
     }
+  }
+
+  private[micrometer] def getLongTaskTimer(registry: instrument.MeterRegistry, name: String,
+                                           help: Option[String], tags: Seq[instrument.Tag],
+                                           minimumExpectedValue: Option[FiniteDuration] = None,
+                                           maximumExpectedValue: Option[FiniteDuration] = None,
+                                           serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+                                           distributionStatisticExpiry: Option[FiniteDuration] = None,
+                                           distributionStatisticBufferLength: Option[Int] = None,
+                                           publishPercentiles: Seq[Double] = Seq.empty,
+                                           publishPercentileHistogram: Option[Boolean] = None,
+                                           percentilePrecision: Option[Int] = None): LongTaskTimer = {
+    val builder = instrument.LongTaskTimer
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+    minimumExpectedValue match {
+      case Some(min) => builder.minimumExpectedValue(toJava(min))
+      case _ =>
+    }
+    maximumExpectedValue match {
+      case Some(max) => builder.maximumExpectedValue(toJava(max))
+      case _ =>
+    }
+    if (serviceLevelObjectives.nonEmpty) {
+      builder.serviceLevelObjectives(serviceLevelObjectives.map(toJava): _*)
+    }
+    distributionStatisticExpiry match {
+      case Some(exp) => builder.distributionStatisticExpiry(toJava(exp))
+      case _ =>
+    }
+    distributionStatisticBufferLength match {
+      case Some(len) => builder.distributionStatisticBufferLength(len)
+      case _ =>
+    }
+    if (publishPercentiles.nonEmpty) builder.publishPercentiles(publishPercentiles: _*)
+    publishPercentileHistogram match {
+      case Some(bool) => builder.publishPercentileHistogram(bool)
+      case _ =>
+    }
+    percentilePrecision match {
+      case Some(len) => builder.percentilePrecision(len)
+      case _ =>
+    }
+    val timer = builder.register(registry)
+    new LongTaskTimer with HasMicrometerMeterId {
+      override def baseTimeUnit: UIO[TimeUnit] = ZIO.succeed(timer.baseTimeUnit())
+      override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.duration(timeUnit))
+      override def max(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.max(timeUnit))
+      override def mean(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(timer.mean(timeUnit))
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(timer.getId)
+
+      override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
+        val sample = timer.start()
+        new TimerSample {
+          override def stop(): UIO[Unit] = ZIO.succeed(sample.stop())
+        }
+      }
+    }
+  }
+
+  override def labelled(
+     name: String,
+     help: Option[String],
+     labelNames: Seq[String]
+   ): ZIO[Registry, Throwable, Seq[String] => Timer] =
+    labelledWithOptions(name, help, labelNames)
+
+  def labelledLongTaskTimer(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None
+  ): ZIO[Registry, Throwable, Seq[String] => LongTaskTimer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimerWrapper(r, name = name, help = help, labelNames = labelNames,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+      timerWrapper.longTaskTimerFor(labelValues)
+
+  def labelledWithOptions(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    pauseDetector: Option[PauseDetector] = None
+  ): ZIO[Registry, Throwable, Seq[String] => Timer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimerWrapper(r, name = name, help = help, labelNames = labelNames,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, pauseDetector = pauseDetector
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+      timerWrapper.timerFor(labelValues)
 }
-*/
 
 private class GaugeWrapper(meterRegistry: instrument.MeterRegistry,
                            name: String,
@@ -134,11 +435,12 @@ private class TFunctionGaugeWrapper[T](meterRegistry: instrument.MeterRegistry,
                                        help: Option[String],
                                        labelNames: Seq[String],
                                        t: T,
-                                       fun: T => Double) {
+                                       fun: T => Double,
+                                       strongReference: Boolean = false) {
 
   def gaugeFor(labelValues: Seq[String]): ReadOnlyGauge = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
-    Gauge.getTFunctionGauge(meterRegistry, name, help, tags, t, fun)
+    Gauge.getTFunctionGauge(meterRegistry, name, help, tags, t, fun, strongReference)
   }
 }
 
@@ -189,13 +491,14 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   private[micrometer] def getTFunctionGauge[T](registry: instrument.MeterRegistry, name: String,
                                                help: Option[String], tags: Seq[instrument.Tag],
-                                               t: T, fun: T => Double): ReadOnlyGauge = {
+                                               t: T, fun: T => Double, strongReference: Boolean = false): ReadOnlyGauge = {
     val mGauge = instrument.Gauge
       .builder(name, new Supplier[Number]() {
         override def get(): Number = fun(t)
       })
       .description(help.getOrElse(""))
       .tags(tags.asJava)
+      .strongReference(strongReference)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
       override def get: UIO[Double]               = ZIO.succeed(fun(t))
@@ -223,11 +526,12 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     help: Option[String],
     labelNames: Seq[String],
     t: T,
-    fun: T => Double
+    fun: T => Double,
+    strongReference: Boolean = false
   ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyGauge] = {
     for {
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.attempt(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun))
+        ZIO.attempt(new TFunctionGaugeWrapper(r, name, help, labelNames, t, fun, strongReference))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
@@ -247,79 +551,3 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       gaugeWrapper.gaugeFor(labelValues)
     }
 }
-
-/*
-sealed trait Buckets
-object Buckets {
-  object Default                                                          extends Buckets
-  final case class Simple(buckets: Seq[Double])                           extends Buckets
-  final case class Linear(start: Double, width: Double, count: Int)       extends Buckets
-  final case class Exponential(start: Double, factor: Double, count: Int) extends Buckets
-}
-
-trait Histogram extends TimerMetric
-object Histogram extends LabelledMetricP[Registry with Clock, Throwable, Buckets, Histogram] {
-  def labelled(
-    name: String,
-    buckets: Buckets,
-    help: Option[String],
-    labels: Seq[String]
-  ): ZIO[Registry with Clock, Throwable, Seq[String] => Histogram] =
-    for {
-      clock <- ZIO.service[Clock.Service]
-      pHistogram <- updateRegistry { r =>
-                     ZIO.effect {
-                       val builder = instrument.Timer
-                         .builder(name)
-                         .description(help.getOrElse(""))
-                         .publishPercentileHistogram()
-                       (
-                         buckets match {
-                           case Buckets.Default              => builder
-                           case Buckets.Simple(bs)           => builder.buckets(bs: _*)
-                           case Buckets.Linear(s, w, c)      => builder.linearBuckets(s, w, c)
-                           case Buckets.Exponential(s, f, c) => builder.exponentialBuckets(s, f, c)
-                         }
-                       ).register(r)
-                     }
-                   }
-    } yield { (labels: Seq[String]) =>
-      val child = pHistogram.labels(labels: _*)
-      new TimerMetricImpl(clock) with Histogram {
-        override def observe(amount: Duration): UIO[Unit] =
-          ZIO.effectTotal(child.observe(amount.toNanos() * 1e-9))
-      }
-    }
-}
-
-final case class Quantile(percentile: Double, tolerance: Double)
-
-trait Summary extends TimerMetric
-object Summary extends LabelledMetricP[Registry with Clock, Throwable, List[Quantile], Summary] {
-  def labelled(
-    name: String,
-    quantiles: List[Quantile],
-    help: Option[String],
-    labels: Seq[String]
-  ): ZIO[Registry with Clock, Throwable, Seq[String] => Summary] =
-    for {
-      clock <- ZIO.service[Clock.Service]
-      pHistogram <- updateRegistry { r =>
-                     ZIO.effect {
-                       val builder = instrument.Summary
-                         .build()
-                         .name(name)
-                         .help(help.getOrElse(""))
-                         .labelNames(labels: _*)
-                       quantiles.foldLeft(builder)((b, c) => b.quantile(c.percentile, c.tolerance)).register(r)
-                     }
-                   }
-    } yield { (labels: Seq[String]) =>
-      val child = pHistogram.labels(labels: _*)
-      new TimerMetricImpl(clock) with Summary {
-        override def observe(amount: Duration): UIO[Unit] =
-          ZIO.effectTotal(child.observe(amount.toNanos() * 1e-9))
-      }
-    }
-}
-*/
