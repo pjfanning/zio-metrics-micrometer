@@ -7,7 +7,7 @@ import zio.clock.Clock
 import zio.duration.Duration
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, ZSpec, assert}
-import zio.{Has, ZIO}
+import zio.ZIO
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.NANOSECONDS
