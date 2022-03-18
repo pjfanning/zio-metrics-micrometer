@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, ReadOnlyGauge}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import zio._
@@ -8,6 +8,7 @@ import zio._
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.Duration
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -54,6 +55,83 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
       }
     }
 }
+
+private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry,
+                                         name: String,
+                                         help: Option[String],
+                                         labelNames: Seq[String],
+                                         scale: Double = 1.0,
+                                         minimumExpectedValue: Option[Double] = None,
+                                         maximumExpectedValue: Option[Double] = None,
+                                         serviceLevelObjectives: Seq[Double] = Seq.empty,
+                                         distributionStatisticExpiry: Option[Duration] = None,
+                                         distributionStatisticBufferLength: Option[Long] = None,
+                                         publishPercentiles: Seq[Double] = Seq.empty,
+                                         publishPercentileHistogram: Option[Boolean] = None,
+                                         percentilePrecision: Option[Int] = None,
+                                         baseUnit: Option[String] = None) {
+
+  def summaryFor(labelValues: Seq[String]): DistributionSummary = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    DistributionSummary.getDistributionSummary(meterRegistry, name, help, tags)
+  }
+}
+
+object DistributionSummary extends LabelledMetric[Registry, Throwable, DistributionSummary] {
+
+  private[micrometer] def getDistributionSummary(registry: instrument.MeterRegistry, name: String,
+                                                 help: Option[String], tags: Seq[instrument.Tag]): DistributionSummary = {
+    val ds = instrument.DistributionSummary
+      .builder(name)
+      .description(help.getOrElse(""))
+      .tags(tags.asJava)
+      .register(registry)
+    new DistributionSummary with HasMicrometerMeterId {
+      override def count: UIO[Double] = ZIO.effectTotal(ds.count())
+      override def totalAmount: UIO[Double] = ZIO.effectTotal(ds.totalAmount())
+      override def max: UIO[Double] = ZIO.effectTotal(ds.max())
+      override def mean: UIO[Double] = ZIO.effectTotal(ds.mean())
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(ds.getId)
+      override def record(value: Double): UIO[Unit] = ZIO.effectTotal(ds.record(value))
+    }
+  }
+
+  override def labelled(
+     name: String,
+     help: Option[String],
+     labelNames: Seq[String]
+   ): ZIO[Registry, Throwable, Seq[String] => DistributionSummary] =
+    labelledWithOptions(name, help, labelNames)
+
+  def labelledWithOptions(
+    name: String,
+    help: Option[String],
+    labelNames: Seq[String],
+    scale: Double = 1.0,
+    minimumExpectedValue: Option[Double] = None,
+    maximumExpectedValue: Option[Double] = None,
+    serviceLevelObjectives: Seq[Double] = Seq.empty,
+    distributionStatisticExpiry: Option[Duration] = None,
+    distributionStatisticBufferLength: Option[Long] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    baseUnit: Option[String] = None
+  ): ZIO[Registry, Throwable, Seq[String] => DistributionSummary] =
+    for {
+      summaryWrapper <- updateRegistry { r =>
+        ZIO.effect(new DistributionSummaryWrapper(r, name = name, help = help, labelNames = labelNames,
+          scale = scale, minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, baseUnit = baseUnit
+        ))
+      }
+    } yield (labelValues: Seq[String]) =>
+        summaryWrapper.summaryFor(labelValues)
+}
+
 
 /*
 trait Timer {
