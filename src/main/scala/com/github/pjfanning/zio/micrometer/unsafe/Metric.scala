@@ -148,8 +148,8 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
 
   def labelled(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String],
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
     scale: Double = 1.0,
     minimumExpectedValue: Option[Double] = None,
     maximumExpectedValue: Option[Double] = None,
@@ -342,8 +342,8 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
 
   def labelled(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String],
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
     minimumExpectedValue: Option[FiniteDuration] = None,
     maximumExpectedValue: Option[FiniteDuration] = None,
     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
@@ -370,8 +370,8 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
 
   def labelledLongTaskTimer(
     name: String,
-    help: Option[String],
-    labelNames: Seq[String],
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
     minimumExpectedValue: Option[FiniteDuration] = None,
     maximumExpectedValue: Option[FiniteDuration] = None,
     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
@@ -512,8 +512,8 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
 
   def labelledFunction[T](
     name: String,
-    help: Option[String],
-    labelNames: Seq[String],
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
     t: T,
     fun: T => Double,
     strongReference: Boolean = false
