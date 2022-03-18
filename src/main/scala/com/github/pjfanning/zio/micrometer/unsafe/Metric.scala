@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, ReadOnlyGauge, Timer}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, ReadOnlyGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
@@ -267,6 +267,13 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
       override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(timer.getId)
       override def record(duration: Duration): UIO[Unit] = ZIO.effectTotal(timer.record(duration))
       override def record(duration: FiniteDuration): UIO[Unit] = ZIO.effectTotal(timer.record(toJava(duration)))
+
+      override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
+        val sample = instrument.Timer.start()
+        new TimerSample {
+          override def stop(): UIO[Unit] = ZIO.effectTotal(sample.stop(timer))
+        }
+      }
     }
   }
 
