@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, TimeGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
@@ -10,7 +10,7 @@ import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -19,9 +19,16 @@ private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
                              help: Option[String],
                              labelNames: Seq[String]) {
 
-  def counterFor(labelValues: Seq[String]): instrument.Counter = {
+  def counterFor(labelValues: Seq[String]): Counter = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
-    Counter.getCounter(meterRegistry, name, help, tags)
+    val mCounter = Counter.getCounter(meterRegistry, name, help, tags)
+    new Counter with HasMicrometerMeterId {
+      override def inc(amount: Double): UIO[Unit] = ZIO.succeed(mCounter.increment(amount))
+
+      override def get: UIO[Double] = ZIO.succeed(mCounter.count())
+
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(mCounter.getId)
+    }
   }
 }
 
@@ -46,16 +53,19 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
         ZIO.attempt(new CounterWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
-      new Counter with HasMicrometerMeterId {
-        private lazy val counter = counterWrapper.counterFor(labelValues)
-
-        override def inc(amount: Double): UIO[Unit] = ZIO.succeed(counter.increment(amount))
-
-        override def get: UIO[Double] = ZIO.succeed(counter.count())
-
-        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.succeed(counter.getId)
-      }
+      counterWrapper.counterFor(labelValues)
     }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+  ): ZIO[Registry, Throwable, Counter] = {
+    for {
+      counterWrapper <- updateRegistry { r =>
+        ZIO.attempt(new CounterWrapper(r, name, help, Seq.empty))
+      }
+    } yield counterWrapper.counterFor(Seq.empty)
+  }
 }
 
 private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry,
@@ -172,6 +182,32 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
       }
     } yield (labelValues: Seq[String]) =>
         summaryWrapper.summaryFor(labelValues)
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+    scale: Double = 1.0,
+    minimumExpectedValue: Option[Double] = None,
+    maximumExpectedValue: Option[Double] = None,
+    serviceLevelObjectives: Seq[Double] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    baseUnit: Option[String] = None
+  ): ZIO[Registry, Throwable, DistributionSummary] =
+    for {
+      summaryWrapper <- updateRegistry { r =>
+        ZIO.attempt(new DistributionSummaryWrapper(r, name = name, help = help, labelNames = Seq.empty,
+          scale = scale, minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, baseUnit = baseUnit
+        ))
+      }
+    } yield summaryWrapper.summaryFor(Seq.empty)
 }
 
 private class TimerWrapper(meterRegistry: instrument.MeterRegistry,
@@ -509,6 +545,18 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
+  def unlabelledFunction(
+    name: String,
+    help: Option[String] = None,
+    fun: () => Double
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.attempt(new FunctionGaugeWrapper(r, name, help, Seq.empty, fun()))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
   def labelledTFunction[T](
     name: String,
     help: Option[String] = None,
@@ -526,6 +574,20 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
+  def unlabelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    t: T,
+    fun: T => Double,
+    strongReference: Boolean = false
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TFunctionGaugeWrapper(r, name, help, Seq.empty, t, fun, strongReference))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
   def labelled(
     name: String,
     help: Option[String] = None,
@@ -538,4 +600,86 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
     }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+  ): ZIO[Registry, Throwable, Gauge] =
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.attempt(new GaugeWrapper(r, name, help, Seq.empty))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+}
+
+private class TimeGaugeWrapper(clock: Clock,
+                               meterRegistry: instrument.MeterRegistry,
+                               name: String,
+                               help: Option[String],
+                               labelNames: Seq[String],
+                               timeUnit: TimeUnit) {
+
+  def gaugeFor(labelValues: Seq[String]): TimeGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    TimeGauge.getGauge(clock, meterRegistry, name, help, tags, timeUnit)
+  }
+}
+
+object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
+
+  private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, TimeGauge]]()
+
+  private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, TimeGauge] = {
+    gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, TimeGauge]())
+  }
+
+  private[micrometer] def getGauge(clock: Clock, registry: instrument.MeterRegistry, name: String,
+                                   help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): TimeGauge = {
+    gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
+      val atomicDouble = new AtomicDouble()
+      val mGauge = instrument.TimeGauge
+        .builder(name, new Supplier[Number]() {
+          override def get(): Number = atomicDouble.get()
+        }, timeUnit)
+        .description(help.orNull)
+        .tags(tags.asJava)
+        .register(registry)
+      new TimeGauge with HasMicrometerMeterId {
+        override def getMeterId: UIO[Meter.Id] = ZIO.succeed(mGauge.getId)
+        override def baseTimeUnit: UIO[TimeUnit] = ZIO.succeed(mGauge.baseTimeUnit())
+        override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(mGauge.value(timeUnit))
+        override def record(duration: Duration): UIO[Unit] = ZIO.succeed {
+          val convertedDuration = toScala(duration).toUnit(mGauge.baseTimeUnit())
+          atomicDouble.addAndGet(convertedDuration)
+        }
+        override def record(duration: FiniteDuration): UIO[Unit] = ZIO.succeed {
+          atomicDouble.addAndGet(duration.toUnit(mGauge.baseTimeUnit()))
+        }
+        override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
+          new TimerSample {
+            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+            override def stop(): UIO[Unit] = for {
+              endTime <- clock.currentTime(mGauge.baseTimeUnit())
+            } yield atomicDouble.addAndGet(endTime - startTime)
+          }
+        }
+      }
+    })
+  }
+
+  def labelled(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    timeUnit: TimeUnit = SECONDS
+  ): ZIO[Registry with Clock, Throwable, Seq[String] => TimeGauge] = {
+    for {
+      clock <- ZIO.service[Clock]
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimeGaugeWrapper(clock, r, name, help, labelNames, timeUnit))
+      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
+  }
 }

@@ -11,15 +11,23 @@ trait TimerSample {
 trait TimerBase {
   def baseTimeUnit: UIO[TimeUnit]
   def totalTime(timeUnit: TimeUnit): UIO[Double]
-  def max(timeUnit: TimeUnit): UIO[Double]
-  def mean(timeUnit: TimeUnit): UIO[Double]
   def startTimerSample(): UIO[TimerSample]
 }
 
-trait Timer extends TimerBase {
+trait TimeGauge extends TimerBase {
+  def record(duration: Duration): UIO[Unit]
+  def record(duration: FiniteDuration): UIO[Unit]
+}
+
+trait TimerWithMinMax extends TimerBase {
+  def max(timeUnit: TimeUnit): UIO[Double]
+  def mean(timeUnit: TimeUnit): UIO[Double]
+}
+
+trait Timer extends TimerWithMinMax {
   def count: UIO[Double]
   def record(duration: Duration): UIO[Unit]
   def record(duration: FiniteDuration): UIO[Unit]
 }
 
-trait LongTaskTimer extends TimerBase
+trait LongTaskTimer extends TimerWithMinMax
