@@ -1,17 +1,18 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, TimeGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
 import zio._
+import zio.clock.Clock
 import zio.duration.Duration
 
 import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -453,11 +454,15 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         .tags(tags.asJava)
         .register(registry)
       new Gauge with HasMicrometerMeterId {
-        override def get: UIO[Double]               = ZIO.effectTotal(atomicDouble.get())
-        override def set(value: Double): UIO[Unit]  = ZIO.effectTotal(atomicDouble.set(value))
+        override def get: UIO[Double] = ZIO.effectTotal(atomicDouble.get())
+
+        override def set(value: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.set(value))
+
         override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
+
         override def dec(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(-amount))
-        override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+
+        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
       }
     })
   }
@@ -473,8 +478,9 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .tags(tags.asJava)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
-      override def get: UIO[Double]               = ZIO.effectTotal(fun)
-      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+      override def get: UIO[Double] = ZIO.effectTotal(fun)
+
+      override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
     }
   }
 
@@ -490,8 +496,9 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
       .strongReference(strongReference)
       .register(registry)
     new ReadOnlyGauge with HasMicrometerMeterId {
-      override def get: UIO[Double]               = ZIO.effectTotal(fun(t))
-      override def getMeterId: UIO[Meter.Id]      = ZIO.effectTotal(mGauge.getId)
+      override def get: UIO[Double] = ZIO.effectTotal(fun(t))
+
+      override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
     }
   }
 
@@ -539,4 +546,76 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
     }
+}
+
+private class TimeGaugeWrapper(clock: Clock.Service,
+                               meterRegistry: instrument.MeterRegistry,
+                               name: String,
+                               help: Option[String],
+                               labelNames: Seq[String],
+                               timeUnit: TimeUnit) {
+
+  def gaugeFor(labelValues: Seq[String]): TimeGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    TimeGauge.getGauge(clock, meterRegistry, name, help, tags, timeUnit)
+  }
+}
+
+object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
+
+  private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, TimeGauge]]()
+
+  private def gaugeMap(registry: instrument.MeterRegistry): TrieMap[MeterKey, TimeGauge] = {
+    gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, TimeGauge]())
+  }
+
+  private[micrometer] def getGauge(clock: Clock.Service, registry: instrument.MeterRegistry, name: String,
+                                   help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): TimeGauge = {
+    gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
+      val atomicDouble = new AtomicDouble()
+      val mGauge = instrument.TimeGauge
+        .builder(name, new Supplier[Number]() {
+          override def get(): Number = atomicDouble.get()
+        }, timeUnit)
+        .description(help.orNull)
+        .tags(tags.asJava)
+        .register(registry)
+      new TimeGauge with HasMicrometerMeterId {
+        override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
+        override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(mGauge.baseTimeUnit())
+        override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.effectTotal(mGauge.value(timeUnit))
+        override def record(duration: Duration): UIO[Unit] = ZIO.effectTotal {
+          val convertedDuration = toScala(duration).toUnit(mGauge.baseTimeUnit())
+          atomicDouble.addAndGet(convertedDuration)
+        }
+        override def record(duration: FiniteDuration): UIO[Unit] = ZIO.effectTotal {
+          atomicDouble.addAndGet(duration.toUnit(mGauge.baseTimeUnit()))
+        }
+        override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
+          new TimerSample {
+            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+            override def stop(): UIO[Unit] = for {
+              endTime <- clock.currentTime(mGauge.baseTimeUnit())
+            } yield atomicDouble.addAndGet(endTime - startTime)
+          }
+        }
+      }
+    })
+  }
+
+  def labelled(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    timeUnit: TimeUnit = SECONDS
+  ): ZIO[Registry with Clock, Throwable, Seq[String] => TimeGauge] = {
+    for {
+      clock <- ZIO.service[Clock.Service]
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new TimeGaugeWrapper(clock, r, name, help, labelNames, timeUnit))
+      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
+  }
 }
