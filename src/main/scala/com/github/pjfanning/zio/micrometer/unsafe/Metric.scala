@@ -21,9 +21,16 @@ private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
                              help: Option[String],
                              labelNames: Seq[String]) {
 
-  def counterFor(labelValues: Seq[String]): instrument.Counter = {
+  def counterFor(labelValues: Seq[String]): Counter = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
-    Counter.getCounter(meterRegistry, name, help, tags)
+    val mCounter = Counter.getCounter(meterRegistry, name, help, tags)
+    new Counter with HasMicrometerMeterId {
+      override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(mCounter.increment(amount))
+
+      override def get: UIO[Double] = ZIO.effectTotal(mCounter.count())
+
+      override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(mCounter.getId)
+    }
   }
 }
 
@@ -48,16 +55,19 @@ object Counter extends LabelledMetric[Registry, Throwable, Counter] {
         ZIO.effect(new CounterWrapper(r, name, help, labelNames))
       }
     } yield { (labelValues: Seq[String]) =>
-      new Counter with HasMicrometerMeterId {
-        private lazy val counter = counterWrapper.counterFor(labelValues)
-
-        override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(counter.increment(amount))
-
-        override def get: UIO[Double] = ZIO.effectTotal(counter.count())
-
-        override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(counter.getId)
-      }
+      counterWrapper.counterFor(labelValues)
     }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+  ): ZIO[Registry, Throwable, Counter] = {
+    for {
+      counterWrapper <- updateRegistry { r =>
+        ZIO.effect(new CounterWrapper(r, name, help, Seq.empty))
+      }
+    } yield counterWrapper.counterFor(Seq.empty)
+  }
 }
 
 private class DistributionSummaryWrapper(meterRegistry: instrument.MeterRegistry,
