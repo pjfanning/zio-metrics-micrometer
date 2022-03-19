@@ -593,7 +593,7 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         }
         override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
           new TimerSample {
-            val startTime = Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
             override def stop(): UIO[Unit] = for {
               endTime <- clock.currentTime(mGauge.baseTimeUnit())
             } yield atomicDouble.addAndGet(endTime - startTime)
