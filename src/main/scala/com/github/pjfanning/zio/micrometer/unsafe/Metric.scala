@@ -184,6 +184,32 @@ object DistributionSummary extends LabelledMetric[Registry, Throwable, Distribut
       }
     } yield (labelValues: Seq[String]) =>
         summaryWrapper.summaryFor(labelValues)
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+    scale: Double = 1.0,
+    minimumExpectedValue: Option[Double] = None,
+    maximumExpectedValue: Option[Double] = None,
+    serviceLevelObjectives: Seq[Double] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    baseUnit: Option[String] = None
+  ): ZIO[Registry, Throwable, DistributionSummary] =
+    for {
+      summaryWrapper <- updateRegistry { r =>
+        ZIO.effect(new DistributionSummaryWrapper(r, name = name, help = help, labelNames = Seq.empty,
+          scale = scale, minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, baseUnit = baseUnit
+        ))
+      }
+    } yield summaryWrapper.summaryFor(Seq.empty)
 }
 
 private class TimerWrapper(meterRegistry: instrument.MeterRegistry,
@@ -527,6 +553,18 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
+  def unlabelledFunction(
+    name: String,
+    help: Option[String] = None,
+    fun: () => Double
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new FunctionGaugeWrapper(r, name, help, Seq.empty, fun()))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
   def labelledTFunction[T](
     name: String,
     help: Option[String] = None,
@@ -544,6 +582,20 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     }
   }
 
+  def unlabelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    t: T,
+    fun: T => Double,
+    strongReference: Boolean = false
+  ): ZIO[Registry, Throwable, ReadOnlyGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new TFunctionGaugeWrapper(r, name, help, Seq.empty, t, fun, strongReference))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
   def labelled(
     name: String,
     help: Option[String] = None,
@@ -556,6 +608,16 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
     }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+  ): ZIO[Registry, Throwable, Gauge] =
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new GaugeWrapper(r, name, help, Seq.empty))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
 }
 
 private class TimeGaugeWrapper(clock: Clock.Service,
