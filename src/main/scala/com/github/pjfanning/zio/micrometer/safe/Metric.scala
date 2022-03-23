@@ -29,4 +29,22 @@ object Counter extends LabelledMetric[Registry with Logging, Counter] {
         fallbackZio.zipPar(logZio).map(_._1)
     }
   }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None
+  ): URIO[Registry with Logging, Counter] = {
+    UnsafeCounter.unlabelled(name, help).catchAll {
+      case NonFatal(t) =>
+        val logZio = log.throwable("Issue creating counter", t)
+        val fallbackZio = URIO.effectTotal {
+          val atomicDouble = new AtomicDouble()
+          new Counter {
+            def inc(amount: Double): UIO[Unit] = URIO.succeed(atomicDouble.addAndGet(amount))
+            def get: UIO[Double] = URIO.succeed(atomicDouble.get())
+          }
+        }
+        fallbackZio.zipPar(logZio).map(_._1)
+    }
+  }
 }
