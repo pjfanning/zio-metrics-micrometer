@@ -402,6 +402,30 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
     } yield (labelValues: Seq[String]) =>
       timerWrapper.timerFor(labelValues)
 
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    pauseDetector: Option[PauseDetector] = None
+  ): ZIO[Registry, Throwable, Timer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimerWrapper(r, name = name, help = help, labelNames = Seq.empty,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision, pauseDetector = pauseDetector
+        ))
+      }
+    } yield timerWrapper.timerFor(Seq.empty)
 
   def labelledLongTaskTimer(
     name: String,
@@ -428,6 +452,30 @@ object Timer extends LabelledMetric[Registry, Throwable, Timer] {
       }
     } yield (labelValues: Seq[String]) =>
       timerWrapper.longTaskTimerFor(labelValues)
+
+  def unlabelledLongTaskTimer(
+     name: String,
+     help: Option[String] = None,
+     minimumExpectedValue: Option[FiniteDuration] = None,
+     maximumExpectedValue: Option[FiniteDuration] = None,
+     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+     distributionStatisticExpiry: Option[FiniteDuration] = None,
+     distributionStatisticBufferLength: Option[Int] = None,
+     publishPercentiles: Seq[Double] = Seq.empty,
+     publishPercentileHistogram: Option[Boolean] = None,
+     percentilePrecision: Option[Int] = None
+   ): ZIO[Registry, Throwable, LongTaskTimer] =
+    for {
+      timerWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimerWrapper(r, name = name, help = help, labelNames = Seq.empty,
+          minimumExpectedValue = minimumExpectedValue, maximumExpectedValue = maximumExpectedValue,
+          serviceLevelObjectives = serviceLevelObjectives, distributionStatisticExpiry = distributionStatisticExpiry,
+          distributionStatisticBufferLength = distributionStatisticBufferLength,
+          publishPercentiles = publishPercentiles, publishPercentileHistogram = publishPercentileHistogram,
+          percentilePrecision = percentilePrecision
+        ))
+      }
+    } yield timerWrapper.longTaskTimerFor(Seq.empty)
 
 }
 
@@ -682,4 +730,18 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
       gaugeWrapper.gaugeFor(labelValues)
     }
   }
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+    timeUnit: TimeUnit = SECONDS
+  ): ZIO[Registry with Clock, Throwable, TimeGauge] = {
+    for {
+      clock <- ZIO.service[Clock]
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.attempt(new TimeGaugeWrapper(clock, r, name, help, Seq.empty, timeUnit))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
 }
