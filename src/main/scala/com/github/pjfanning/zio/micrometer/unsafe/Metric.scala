@@ -26,9 +26,7 @@ private class CounterWrapper(meterRegistry: instrument.MeterRegistry,
     val mCounter = Counter.getCounter(meterRegistry, name, help, tags)
     new Counter with HasMicrometerMeterId {
       override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(mCounter.increment(amount))
-
       override def get: UIO[Double] = ZIO.effectTotal(mCounter.count())
-
       override def getMeterId: UIO[instrument.Meter.Id] = ZIO.effectTotal(mCounter.getId)
     }
   }
@@ -539,13 +537,9 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         .register(registry)
       new Gauge with HasMicrometerMeterId {
         override def get: UIO[Double] = ZIO.effectTotal(atomicDouble.get())
-
         override def set(value: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.set(value))
-
         override def inc(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(amount))
-
         override def dec(amount: Double): UIO[Unit] = ZIO.effectTotal(atomicDouble.addAndGet(-amount))
-
         override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
       }
     })
