@@ -67,7 +67,8 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
         },
         test("counter ids match") {
           for {
-            (id1, id2) <- counterZipTestZIO
+            tuple <- counterZipTestZIO
+            (id1, id2) = tuple
           } yield assert(id1)(equalTo(id2))
         }
       ),
