@@ -1,31 +1,32 @@
 package com.github.pjfanning.zio.micrometer
 
-import java.{util => ju}
 import io.micrometer.core.instrument
 import zio.{Has, RIO, Semaphore, Task, UIO, ULayer, ZIO}
+
+import scala.collection.JavaConverters._
 
 package object unsafe {
   type Registry = Has[Registry.Service]
 
   object Registry {
     trait Service {
-      def collectorRegistry: UIO[instrument.MeterRegistry]
+      def meterRegistry: UIO[instrument.MeterRegistry]
 
       def updateRegistry[A](f: instrument.MeterRegistry => Task[A]): Task[A]
 
-      def collect: UIO[ju.List[instrument.Meter]]
+      def collect: UIO[Seq[instrument.Meter]]
     }
 
     private final class ServiceImpl(registry: instrument.MeterRegistry, lock: Semaphore) extends Service {
 
-      def collectorRegistry: UIO[instrument.MeterRegistry] = ZIO.succeed(registry)
+      def meterRegistry: UIO[instrument.MeterRegistry] = ZIO.succeed(registry)
 
       def updateRegistry[A](f: instrument.MeterRegistry => Task[A]): Task[A] = lock.withPermit {
         f(registry)
       }
 
-      def collect: zio.UIO[ju.List[instrument.Meter]] =
-        ZIO.effectTotal(registry.getMeters)
+      def collect: zio.UIO[Seq[instrument.Meter]] =
+        ZIO.effectTotal(registry.getMeters.asScala.toSeq)
     }
 
     private object ServiceImpl {
@@ -39,13 +40,10 @@ package object unsafe {
   }
 
   def collectorRegistry: RIO[Registry, instrument.MeterRegistry] =
-    ZIO.serviceWith(_.collectorRegistry)
+    ZIO.serviceWith(_.meterRegistry)
 
   def updateRegistry[A](f: instrument.MeterRegistry => Task[A]): RIO[Registry, A] =
     ZIO.serviceWith(_.updateRegistry(f))
-
-  def collect: RIO[Registry, ju.List[instrument.Meter]] =
-    ZIO.serviceWith(_.collect)
 
   def zipLabelsAsTags(labelNames: Seq[String], labelValues: Seq[String]): Seq[instrument.Tag] = {
     labelNames.zip(labelValues).map { case (labelName, labelValue) =>
