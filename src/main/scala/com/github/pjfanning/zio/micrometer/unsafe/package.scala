@@ -39,7 +39,7 @@ package object unsafe {
     def makeWith(registry: instrument.MeterRegistry): ULayer[Registry] = ServiceImpl.makeWith(registry).toLayer
   }
 
-  def collectorRegistry: RIO[Registry, instrument.MeterRegistry] =
+  def meterRegistry: RIO[Registry, instrument.MeterRegistry] =
     ZIO.serviceWith(_.meterRegistry)
 
   def updateRegistry[A](f: instrument.MeterRegistry => Task[A]): RIO[Registry, A] =
