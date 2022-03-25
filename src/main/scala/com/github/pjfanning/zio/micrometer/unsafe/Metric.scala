@@ -534,6 +534,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
         })
         .description(help.orNull)
         .tags(tags.asJava)
+        .strongReference(true)
         .register(registry)
       new Gauge with HasMicrometerMeterId {
         override def get: UIO[Double] = ZIO.effectTotal(atomicDouble.get())
@@ -693,6 +694,7 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         }, timeUnit)
         .description(help.orNull)
         .tags(tags.asJava)
+        .strongReference(true)
         .register(registry)
       new TimeGauge with HasMicrometerMeterId {
         override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
