@@ -67,7 +67,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       registry <- ZIO.environment[Registry]
       result <- UnsafeGauge.unlabelled(name, help).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating counter" + t)
+          val logZio = ZIO.log("Issue creating gauge " + t)
           val fallbackZio = URIO.succeed(new FallbackGauge)
           fallbackZio.zipPar(logZio)
       }
@@ -109,7 +109,7 @@ object DistributionSummary extends LabelledMetric[Registry, DistributionSummary]
         baseUnit = baseUnit
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating gauge " + t)
+          val logZio = ZIO.log("Issue creating DistributionSummary " + t)
           val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackDistributionSummary)
           fallbackZio.zipPar(logZio)
       }
@@ -147,7 +147,7 @@ object DistributionSummary extends LabelledMetric[Registry, DistributionSummary]
         baseUnit = baseUnit
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating counter" + t)
+          val logZio = ZIO.log("Issue creating DistributionSummary " + t)
           val fallbackZio = URIO.succeed(new FallbackDistributionSummary)
           fallbackZio.zipPar(logZio)
       }
