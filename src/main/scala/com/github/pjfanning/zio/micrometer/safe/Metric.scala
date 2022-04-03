@@ -1,11 +1,12 @@
 package com.github.pjfanning.zio.micrometer.safe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge}
-import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge, TimeGauge => UnsafeTimeGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer}
+import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge, TimeGauge => UnsafeTimeGauge, Timer => UnsafeTimer}
+import io.micrometer.core.instrument.distribution.pause.PauseDetector
 import zio.{URIO, ZIO}
 import zio.logging._
 
-import scala.concurrent.duration.{FiniteDuration, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, TimeUnit}
 import scala.util.control.NonFatal
 
 object Counter extends LabelledMetric[Registry with Logging, Counter] {
@@ -333,4 +334,144 @@ object DistributionSummary extends LabelledMetric[Registry, DistributionSummary]
       }
     } yield result
   }
+}
+
+object Timer extends LabelledMetric[Registry, Timer] {
+
+  def labelled(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    pauseDetector: Option[PauseDetector] = None
+  ): URIO[Registry with Logging, Seq[String] => Timer] =
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeTimer.labelled(name,
+        help = help,
+        labelNames = labelNames,
+        minimumExpectedValue = minimumExpectedValue,
+        maximumExpectedValue = maximumExpectedValue,
+        serviceLevelObjectives = serviceLevelObjectives,
+        distributionStatisticExpiry = distributionStatisticExpiry,
+        distributionStatisticBufferLength = distributionStatisticBufferLength,
+        publishPercentiles = publishPercentiles,
+        publishPercentileHistogram = publishPercentileHistogram,
+        percentilePrecision = percentilePrecision,
+        pauseDetector = pauseDetector
+      ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = log.throwable("Issue creating Timer", t)
+          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
+          fallbackZio.zipPar(logZio).map(_._1)
+      }
+    } yield result
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+    minimumExpectedValue: Option[FiniteDuration] = None,
+    maximumExpectedValue: Option[FiniteDuration] = None,
+    serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+    distributionStatisticExpiry: Option[FiniteDuration] = None,
+    distributionStatisticBufferLength: Option[Int] = None,
+    publishPercentiles: Seq[Double] = Seq.empty,
+    publishPercentileHistogram: Option[Boolean] = None,
+    percentilePrecision: Option[Int] = None,
+    pauseDetector: Option[PauseDetector] = None
+  ): URIO[Registry with Logging, Timer] =
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeTimer.unlabelled(name,
+        help = help,
+        minimumExpectedValue = minimumExpectedValue,
+        maximumExpectedValue = maximumExpectedValue,
+        serviceLevelObjectives = serviceLevelObjectives,
+        distributionStatisticExpiry = distributionStatisticExpiry,
+        distributionStatisticBufferLength = distributionStatisticBufferLength,
+        publishPercentiles = publishPercentiles,
+        publishPercentileHistogram = publishPercentileHistogram,
+        percentilePrecision = percentilePrecision,
+        pauseDetector = pauseDetector
+      ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = log.throwable("Issue creating Timer", t)
+          val fallbackZio = URIO.succeed(new FallbackTimer(NANOSECONDS))
+          fallbackZio.zipPar(logZio).map(_._1)
+      }
+    } yield result
+
+  def labelledLongTaskTimer(
+     name: String,
+     help: Option[String] = None,
+     labelNames: Seq[String] = Seq.empty,
+     minimumExpectedValue: Option[FiniteDuration] = None,
+     maximumExpectedValue: Option[FiniteDuration] = None,
+     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+     distributionStatisticExpiry: Option[FiniteDuration] = None,
+     distributionStatisticBufferLength: Option[Int] = None,
+     publishPercentiles: Seq[Double] = Seq.empty,
+     publishPercentileHistogram: Option[Boolean] = None,
+     percentilePrecision: Option[Int] = None
+   ): URIO[Registry with Logging, Seq[String] => LongTaskTimer] =
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeTimer.labelledLongTaskTimer(name,
+        help = help,
+        labelNames = labelNames,
+        minimumExpectedValue = minimumExpectedValue,
+        maximumExpectedValue = maximumExpectedValue,
+        serviceLevelObjectives = serviceLevelObjectives,
+        distributionStatisticExpiry = distributionStatisticExpiry,
+        distributionStatisticBufferLength = distributionStatisticBufferLength,
+        publishPercentiles = publishPercentiles,
+        publishPercentileHistogram = publishPercentileHistogram,
+        percentilePrecision = percentilePrecision,
+      ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = log.throwable("Issue creating LongTaskTimer", t)
+          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
+          fallbackZio.zipPar(logZio).map(_._1)
+      }
+    } yield result
+
+  def unlabelledLongTaskTimer(
+     name: String,
+     help: Option[String] = None,
+     minimumExpectedValue: Option[FiniteDuration] = None,
+     maximumExpectedValue: Option[FiniteDuration] = None,
+     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+     distributionStatisticExpiry: Option[FiniteDuration] = None,
+     distributionStatisticBufferLength: Option[Int] = None,
+     publishPercentiles: Seq[Double] = Seq.empty,
+     publishPercentileHistogram: Option[Boolean] = None,
+     percentilePrecision: Option[Int] = None
+   ): URIO[Registry with Logging, LongTaskTimer] =
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeTimer.unlabelledLongTaskTimer(name,
+        help = help,
+        minimumExpectedValue = minimumExpectedValue,
+        maximumExpectedValue = maximumExpectedValue,
+        serviceLevelObjectives = serviceLevelObjectives,
+        distributionStatisticExpiry = distributionStatisticExpiry,
+        distributionStatisticBufferLength = distributionStatisticBufferLength,
+        publishPercentiles = publishPercentiles,
+        publishPercentileHistogram = publishPercentileHistogram,
+        percentilePrecision = percentilePrecision,
+      ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = log.throwable("Issue creating LongTaskTimer", t)
+          val fallbackZio = URIO.succeed(new FallbackTimer(NANOSECONDS))
+          fallbackZio.zipPar(logZio).map(_._1)
+      }
+    } yield result
+
 }
