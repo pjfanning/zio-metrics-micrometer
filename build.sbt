@@ -61,7 +61,7 @@ pomExtra := (
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec(Zulu, "8"))
 ThisBuild / githubWorkflowTargetTags ++= Seq("v*")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq(
-  RefPredicate.Equals(Ref.Branch("main")),
+  RefPredicate.Equals(Ref.Branch("zio1")),
   RefPredicate.Equals(Ref.Branch("zio2")),
   RefPredicate.StartsWith(Ref.Tag("v"))
 )
