@@ -11,7 +11,9 @@ private[safe] class FallbackDistributionSummary extends DistributionSummary {
   override def count: UIO[Double] = UIO.succeed(_count)
   override def totalAmount: UIO[Double] = UIO.succeed(_total)
   override def max: UIO[Double] = UIO.succeed(_max)
-  override def mean: UIO[Double] = UIO.succeed(_total / _count)
+  override def mean: UIO[Double] = UIO.succeed {
+    if (_count == 0) Double.NaN else _total / _count
+  }
   override def record(value: Double): UIO[Unit] = semaphore.map { _ =>
     _count += 1
     _total += value
