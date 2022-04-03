@@ -17,7 +17,9 @@ package object safe {
 
       def collect: UIO[Seq[instrument.Meter]]
 
-      def unsafeRegistryLayer: ULayer[UnsafeRegistry]
+      def unsafeRegistry: UIO[UnsafeRegistry.Service]
+
+      def unsafeRegistryLayer: ULayer[UnsafeRegistry.Service] = unsafeRegistry.toLayer
     }
 
     private final class ServiceImpl(registry: instrument.MeterRegistry, lock: Semaphore) extends Service {
@@ -31,8 +33,8 @@ package object safe {
       def collect: zio.UIO[Seq[instrument.Meter]] =
         ZIO.succeed(registry.getMeters.asScala.toSeq)
 
-      lazy val unsafeRegistryLayer: ULayer[UnsafeRegistry] = {
-        UnsafeRegistry.makeWith(registry)
+      lazy val unsafeRegistry: UIO[UnsafeRegistry.Service] = {
+        UnsafeRegistry.makeService(registry)
       }
     }
 

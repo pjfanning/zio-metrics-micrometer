@@ -36,7 +36,8 @@ package object unsafe {
           .map(new ServiceImpl(registry, _))
     }
 
-    def makeWith(registry: instrument.MeterRegistry): ULayer[Registry] = ServiceImpl.makeWith(registry).toLayer
+    def makeService(registry: instrument.MeterRegistry): UIO[Registry.Service] = ServiceImpl.makeWith(registry)
+    def makeWith(registry: instrument.MeterRegistry): ULayer[Registry] = makeService(registry).toLayer
   }
 
   def meterRegistry: RIO[Registry, instrument.MeterRegistry] =
