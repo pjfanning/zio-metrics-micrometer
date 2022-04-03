@@ -3,6 +3,7 @@ package com.github.pjfanning.zio.micrometer.safe
 import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer}
 import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge, TimeGauge => UnsafeTimeGauge, Timer => UnsafeTimer}
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
+import zio.clock.Clock
 import zio.{URIO, ZIO}
 import zio.logging._
 
@@ -147,21 +148,21 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
 
 object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
 
-  /*
   def labelled(
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
     timeUnit: TimeUnit
-  ): URIO[Registry with Clock, Seq[String] => TimeGauge] = {
+  ): URIO[Registry with Logging, Seq[String] => TimeGauge] = {
     for {
       registry <- ZIO.environment[Registry]
-      clock <- ZIO.environment[Clock]
-      result <- UnsafeTimeGauge.labelled(name, help, labelNames, timeUnit).provideLayer(registry.get.unsafeRegistryLayer ++ clock).catchAll {
+      result <- UnsafeTimeGauge.labelled(name, help, labelNames, timeUnit)
+        .provideLayer(registry.get.unsafeRegistryLayer ++ Clock.live)
+        .catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating time gauge " + t)
+          val logZio = log.throwable("Issue creating time gauge", t)
           val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimeGauge(timeUnit))
-          fallbackZio.zipPar(logZio)
+          fallbackZio.zipPar(logZio).map(_._1)
       }
     } yield result
   }
@@ -169,19 +170,19 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     timeUnit: TimeUnit
-  ): URIO[Registry with Clock, Gauge] = {
+  ): URIO[Registry with Logging, TimeGauge] = {
     for {
       registry <- ZIO.environment[Registry]
-      clock <- ZIO.environment[Clock]
-      result <- UnsafeTimeGauge.unlabelled(name, help).provideLayer(registry.get.unsafeRegistryLayer ++ clock).catchAll {
+      result <- UnsafeTimeGauge.unlabelled(name, help)
+        .provideLayer(registry.get.unsafeRegistryLayer ++ Clock.live)
+        .catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating time gauge " + t)
+          val logZio = log.throwable("Issue creating time gauge", t)
           val fallbackZio = URIO.succeed(new FallbackTimeGauge(timeUnit))
-          fallbackZio.zipPar(logZio)
+          fallbackZio.zipPar(logZio).map(_._1)
       }
     } yield result
   }
-  */
 
   def labelledFunction(
     name: String,
