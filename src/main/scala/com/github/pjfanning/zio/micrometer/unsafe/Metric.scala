@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, TimeGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer, TimerSample}
 import io.micrometer.core.instrument
 import io.micrometer.core.instrument.Meter
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
@@ -676,6 +676,34 @@ private class TimeGaugeWrapper(clock: Clock.Service,
   }
 }
 
+private class FunctionTimeGaugeWrapper(meterRegistry: instrument.MeterRegistry,
+                                       name: String,
+                                       help: Option[String],
+                                       labelNames: Seq[String],
+                                       timeUnit: TimeUnit,
+                                       fun: => Double) {
+
+  def gaugeFor(labelValues: Seq[String]): ReadOnlyTimeGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    TimeGauge.getFunctionGauge(meterRegistry, name, help, tags, timeUnit, fun)
+  }
+}
+
+private class TFunctionTimeGaugeWrapper[T](meterRegistry: instrument.MeterRegistry,
+                                           name: String,
+                                           help: Option[String],
+                                           labelNames: Seq[String],
+                                           timeUnit: TimeUnit,
+                                           t: T,
+                                           fun: T => Double,
+                                           strongReference: Boolean = false) {
+
+  def gaugeFor(labelValues: Seq[String]): ReadOnlyTimeGauge = {
+    val tags = zipLabelsAsTags(labelNames, labelValues)
+    TimeGauge.getTFunctionGauge(meterRegistry, name, help, tags, timeUnit, t, fun, strongReference)
+  }
+}
+
 object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
 
   private val gaugeRegistryMap = TrieMap[instrument.MeterRegistry, TrieMap[MeterKey, TimeGauge]]()
@@ -719,6 +747,41 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
     })
   }
 
+  private[micrometer] def getFunctionGauge(registry: instrument.MeterRegistry, name: String,
+                                           help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit,
+                                           fun: => Double): ReadOnlyTimeGauge = {
+    val mGauge = instrument.TimeGauge
+      .builder(name, new Supplier[Number]() {
+        override def get(): Number = fun
+      }, timeUnit)
+      .description(help.orNull)
+      .tags(tags.asJava)
+      .register(registry)
+    new ReadOnlyTimeGauge with HasMicrometerMeterId {
+      override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(timeUnit)
+      override def totalTime(timeUnit: TimeUnit): zio.UIO[Double] = ZIO.effectTotal(mGauge.value(timeUnit))
+      override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
+    }
+  }
+
+  private[micrometer] def getTFunctionGauge[T](registry: instrument.MeterRegistry, name: String,
+                                               help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit,
+                                               t: T, fun: T => Double, strongReference: Boolean = false): ReadOnlyTimeGauge = {
+    val mGauge = instrument.TimeGauge
+      .builder(name, new Supplier[Number]() {
+        override def get(): Number = fun(t)
+      }, timeUnit)
+      .description(help.orNull)
+      .tags(tags.asJava)
+      .strongReference(strongReference)
+      .register(registry)
+    new ReadOnlyTimeGauge with HasMicrometerMeterId {
+      override def baseTimeUnit: UIO[TimeUnit] = ZIO.effectTotal(timeUnit)
+      override def totalTime(timeUnit: TimeUnit): zio.UIO[Double] = ZIO.effectTotal(mGauge.value(timeUnit))
+      override def getMeterId: UIO[Meter.Id] = ZIO.effectTotal(mGauge.getId)
+    }
+  }
+
   def labelled(
     name: String,
     help: Option[String] = None,
@@ -744,6 +807,66 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
       clock <- ZIO.service[Clock.Service]
       gaugeWrapper <- updateRegistry { r =>
         ZIO.effect(new TimeGaugeWrapper(clock, r, name, help, Seq.empty, timeUnit))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
+  def labelledFunction(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    timeUnit: TimeUnit = SECONDS,
+    fun: => Double
+  ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyTimeGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new FunctionTimeGaugeWrapper(r, name, help, labelNames, timeUnit, fun))
+      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
+  }
+
+  def unlabelledFunction(
+    name: String,
+    help: Option[String] = None,
+    timeUnit: TimeUnit = SECONDS,
+    fun: => Double
+  ): ZIO[Registry, Throwable, ReadOnlyTimeGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new FunctionTimeGaugeWrapper(r, name, help, Seq.empty, timeUnit, fun))
+      }
+    } yield gaugeWrapper.gaugeFor(Seq.empty)
+  }
+
+  def labelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    timeUnit: TimeUnit = SECONDS,
+    t: T,
+    fun: T => Double
+  ): ZIO[Registry, Throwable, Seq[String] => ReadOnlyTimeGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new TFunctionTimeGaugeWrapper(r, name, help, labelNames, timeUnit, t, fun))
+      }
+    } yield { (labelValues: Seq[String]) =>
+      gaugeWrapper.gaugeFor(labelValues)
+    }
+  }
+
+  def unlabelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    timeUnit: TimeUnit = SECONDS,
+    t: T,
+    fun: T => Double
+  ): ZIO[Registry, Throwable, ReadOnlyTimeGauge] = {
+    for {
+      gaugeWrapper <- updateRegistry { r =>
+        ZIO.effect(new TFunctionTimeGaugeWrapper(r, name, help, Seq.empty, timeUnit, t, fun))
       }
     } yield gaugeWrapper.gaugeFor(Seq.empty)
   }

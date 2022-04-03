@@ -9,9 +9,12 @@ trait TimerSample {
   def stop(): UIO[Unit]
 }
 
-trait TimerBase {
+trait ReadOnlyTimeGauge {
   def baseTimeUnit: UIO[TimeUnit]
   def totalTime(timeUnit: TimeUnit): UIO[Double]
+}
+
+trait TimerBase extends ReadOnlyTimeGauge {
   def startTimerSample(): UIO[TimerSample]
 }
 
