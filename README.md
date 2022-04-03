@@ -58,4 +58,36 @@ The current API uses the terms `labelled` and `unlabelled` based on zio-metrics 
     case Method.GET -> !! / "metrics" => {
       ZIO.succeed(Response.text(registry.scrape()))
     }
-```    
+```
+
+## API
+
+Counter (package `com.github.pjfanning.zio.micrometer.unsafe`)
+```scala
+  def labelled(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty
+  ): ZIO[Registry, Throwable, Seq[String] => Counter]
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None,
+  ): ZIO[Registry, Throwable, Counter]
+```
+
+Counter (package `com.github.pjfanning.zio.micrometer.safe`)
+```scala
+  def labelled(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty
+  ): URIO[Registry, Seq[String] => Counter]
+
+  def unlabelled(
+    name: String,
+    help: Option[String] = None
+  ): URIO[Registry, Counter]
+```
+
+
