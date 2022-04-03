@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.safe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, ReadOnlyGauge}
 import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge}
 import zio.{URIO, ZIO}
 
@@ -69,6 +69,74 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating gauge " + t)
           val fallbackZio = URIO.succeed(new FallbackGauge)
+          fallbackZio.zipPar(logZio)
+      }
+    } yield result
+  }
+
+  def labelledFunction(
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    fun: () => Double
+  ): URIO[Registry, Seq[String] => ReadOnlyGauge] = {
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeGauge.labelledFunction(name, help, labelNames, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = ZIO.log("Issue creating gauge " + t)
+          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackFunctionGauge(fun))
+          fallbackZio.zipPar(logZio)
+      }
+    } yield result
+  }
+
+  def unlabelledFunction(
+    name: String,
+    help: Option[String] = None,
+    fun: () => Double
+  ): URIO[Registry, ReadOnlyGauge] = {
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeGauge.unlabelledFunction(name, help, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = ZIO.log("Issue creating gauge " + t)
+          val fallbackZio = URIO.succeed(new FallbackFunctionGauge(fun))
+          fallbackZio.zipPar(logZio)
+      }
+    } yield result
+  }
+
+  def labelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    labelNames: Seq[String] = Seq.empty,
+    t: T,
+    fun: T => Double
+  ): URIO[Registry, Seq[String] => ReadOnlyGauge] = {
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeGauge.labelledTFunction(name, help, labelNames, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(throwable) =>
+          val logZio = ZIO.log("Issue creating gauge " + throwable)
+          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTFunctionGauge(t, fun))
+          fallbackZio.zipPar(logZio)
+      }
+    } yield result
+  }
+
+  def unlabelledTFunction[T](
+    name: String,
+    help: Option[String] = None,
+    t: T,
+    fun: T => Double
+  ): URIO[Registry, ReadOnlyGauge] = {
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeGauge.unlabelledTFunction(name, help, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(throwable) =>
+          val logZio = ZIO.log("Issue creating gauge " + throwable)
+          val fallbackZio = URIO.succeed(new FallbackTFunctionGauge(t, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
