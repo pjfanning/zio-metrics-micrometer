@@ -1,12 +1,10 @@
 package com.github.pjfanning.zio.micrometer.safe
 
-import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, HasMicrometerMeterId, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer, TimerSample}
 import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge, TimeGauge => UnsafeTimeGauge, Timer => UnsafeTimer}
-import io.micrometer.core.instrument
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
-import zio.{Clock, Duration, UIO, URIO, ZIO}
+import zio.{Clock, URIO, ZIO}
 
-import scala.compat.java8.DurationConverters.toJava
 import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, TimeUnit}
 import scala.util.control.NonFatal
 
