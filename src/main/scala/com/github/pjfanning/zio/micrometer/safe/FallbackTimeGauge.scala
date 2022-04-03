@@ -22,7 +22,7 @@ private[safe] class FallbackTimeGauge(baseUnit: TimeUnit) extends TimeGauge {
       override def stop(): UIO[Unit] = {
         val task = for {
           clock <- ZIO.service[Clock.Service]
-          endTime <-clock.currentTime(baseUnit)
+          endTime <- clock.currentTime(baseUnit)
         } yield {
           atomicDouble.addAndGet(endTime - startTime)
           ()
