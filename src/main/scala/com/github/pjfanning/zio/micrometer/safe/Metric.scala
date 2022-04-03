@@ -410,7 +410,6 @@ object Timer extends LabelledMetric[Registry, Timer] {
       }
     } yield result
 
-  /*
   def labelledLongTaskTimer(
     name: String,
     help: Option[String] = None,
@@ -439,11 +438,42 @@ object Timer extends LabelledMetric[Registry, Timer] {
         percentilePrecision = percentilePrecision,
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
-          val logZio = ZIO.log("Issue creating Timer " + t)
+          val logZio = ZIO.log("Issue creating LongTaskTimer " + t)
           val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
           fallbackZio.zipPar(logZio)
       }
     } yield result
-   */
+
+  def unlabelledLongTaskTimer(
+     name: String,
+     help: Option[String] = None,
+     minimumExpectedValue: Option[FiniteDuration] = None,
+     maximumExpectedValue: Option[FiniteDuration] = None,
+     serviceLevelObjectives: Seq[FiniteDuration] = Seq.empty,
+     distributionStatisticExpiry: Option[FiniteDuration] = None,
+     distributionStatisticBufferLength: Option[Int] = None,
+     publishPercentiles: Seq[Double] = Seq.empty,
+     publishPercentileHistogram: Option[Boolean] = None,
+     percentilePrecision: Option[Int] = None
+   ): URIO[Registry, LongTaskTimer] =
+    for {
+      registry <- ZIO.environment[Registry]
+      result <- UnsafeTimer.unlabelledLongTaskTimer(name,
+        help = help,
+        minimumExpectedValue = minimumExpectedValue,
+        maximumExpectedValue = maximumExpectedValue,
+        serviceLevelObjectives = serviceLevelObjectives,
+        distributionStatisticExpiry = distributionStatisticExpiry,
+        distributionStatisticBufferLength = distributionStatisticBufferLength,
+        publishPercentiles = publishPercentiles,
+        publishPercentileHistogram = publishPercentileHistogram,
+        percentilePrecision = percentilePrecision,
+      ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
+        case NonFatal(t) =>
+          val logZio = ZIO.log("Issue creating LongTaskTimer " + t)
+          val fallbackZio = URIO.succeed(new FallbackTimer(NANOSECONDS))
+          fallbackZio.zipPar(logZio)
+      }
+    } yield result
 
 }

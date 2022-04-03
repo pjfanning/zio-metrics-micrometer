@@ -1,12 +1,12 @@
 package com.github.pjfanning.zio.micrometer.safe
 
-import com.github.pjfanning.zio.micrometer.{Timer, TimerSample}
+import com.github.pjfanning.zio.micrometer.{LongTaskTimer, Timer, TimerSample}
 import zio.{Semaphore, UIO}
 
 import scala.compat.java8.DurationConverters.toScala
-import scala.concurrent.duration.{Duration, FiniteDuration, NANOSECONDS, TimeUnit}
+import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
 
-private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer {
+private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTaskTimer {
   private val semaphore = Semaphore.make(permits = 1)
   private var _count: Int = 0
   private var _max: Double = 0.0
