@@ -2,7 +2,7 @@
 
 Very early days trying to produce an equivalent of [zio-metrics](https://github.com/zio/zio-metrics) that uses [Micrometer](https://micrometer.io/) instead of directly supporting a specific metrics backend (eg Prometheus, Dropwizard, etc.).
 
-The API is based on the prometheus2 package of zio-metrics but has been modified somewhat. The initial aim is to get some feedback on the API before adding support for all [Micrometer](https://micrometer.io/) metric types and adding full test coverage. Micrometer aim is provide a common interface for multiple metric backends analagous to how [Slf4J](https://www.slf4j.org/) works for logging backends.
+The API is based on the prometheus2 package of zio-metrics but has been modified somewhat. The initial aim is to get some feedback on the API before adding support for all [Micrometer](https://micrometer.io/) metric types and adding full test coverage. Micrometer's aim is provide a common interface for multiple metric backends analagous to how [Slf4J](https://www.slf4j.org/) works for logging backends.
 
 Micrometer supports many metric backends (eg Prometheus, Dropwizard, StatsD, etc.). See Micrometer's [own documentation](https://micrometer.io/docs) for details.
 
