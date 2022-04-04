@@ -8,11 +8,13 @@ ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.1")
 
 val micrometerVersion = "1.8.4"
-val zioVersion        = "2.0.0-RC4"
+val zioVersion        = "2.0.0-RC4+8-1b5bac57-SNAPSHOT"
 
 lazy val root = (project in file("."))
   .settings(
     name := "zio-metrics-micrometer",
+    resolvers +=
+      "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
       "org.scala-lang.modules" %% "scala-java8-compat"             % "1.0.2",
       "dev.zio"                %% "zio"                            % zioVersion,
