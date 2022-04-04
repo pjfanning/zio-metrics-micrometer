@@ -661,8 +661,7 @@ object Gauge extends LabelledMetric[Registry, Throwable, Gauge] {
     } yield gaugeWrapper.gaugeFor(Seq.empty)
 }
 
-private class TimeGaugeWrapper(clock: Clock,
-                               meterRegistry: instrument.MeterRegistry,
+private class TimeGaugeWrapper(meterRegistry: instrument.MeterRegistry,
                                name: String,
                                help: Option[String],
                                labelNames: Seq[String],
@@ -670,7 +669,7 @@ private class TimeGaugeWrapper(clock: Clock,
 
   def gaugeFor(labelValues: Seq[String]): TimeGauge = {
     val tags = zipLabelsAsTags(labelNames, labelValues)
-    TimeGauge.getGauge(clock, meterRegistry, name, help, tags, timeUnit)
+    TimeGauge.getGauge(meterRegistry, name, help, tags, timeUnit)
   }
 }
 
@@ -710,7 +709,7 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
     gaugeRegistryMap.getOrElseUpdate(registry, TrieMap[MeterKey, TimeGauge]())
   }
 
-  private[micrometer] def getGauge(clock: Clock, registry: instrument.MeterRegistry, name: String,
+  private[micrometer] def getGauge(registry: instrument.MeterRegistry, name: String,
                                    help: Option[String], tags: Seq[instrument.Tag], timeUnit: TimeUnit): TimeGauge = {
     gaugeMap(registry).getOrElseUpdate(MeterKey(name, tags), {
       val atomicDouble = new AtomicDouble()
@@ -735,9 +734,9 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         }
         override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
           new TimerSample {
-            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+            val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(mGauge.baseTimeUnit()))
             override def stop(): UIO[Unit] = for {
-              endTime <- clock.currentTime(mGauge.baseTimeUnit())
+              endTime <- Clock.currentTime(mGauge.baseTimeUnit())
             } yield atomicDouble.addAndGet(endTime - startTime)
           }
         }
@@ -785,11 +784,10 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
     timeUnit: TimeUnit = SECONDS
-  ): ZIO[Registry with Clock, Throwable, Seq[String] => TimeGauge] = {
+  ): ZIO[Registry, Throwable, Seq[String] => TimeGauge] = {
     for {
-      clock <- ZIO.service[Clock]
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.attempt(new TimeGaugeWrapper(clock, r, name, help, labelNames, timeUnit))
+        ZIO.attempt(new TimeGaugeWrapper(r, name, help, labelNames, timeUnit))
       }
     } yield { (labelValues: Seq[String]) =>
       gaugeWrapper.gaugeFor(labelValues)
@@ -800,11 +798,10 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
     name: String,
     help: Option[String] = None,
     timeUnit: TimeUnit = SECONDS
-  ): ZIO[Registry with Clock, Throwable, TimeGauge] = {
+  ): ZIO[Registry, Throwable, TimeGauge] = {
     for {
-      clock <- ZIO.service[Clock]
       gaugeWrapper <- updateRegistry { r =>
-        ZIO.attempt(new TimeGaugeWrapper(clock, r, name, help, Seq.empty, timeUnit))
+        ZIO.attempt(new TimeGaugeWrapper(r, name, help, Seq.empty, timeUnit))
       }
     } yield gaugeWrapper.gaugeFor(Seq.empty)
   }
