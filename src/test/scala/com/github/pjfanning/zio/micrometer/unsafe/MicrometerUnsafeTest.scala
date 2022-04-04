@@ -3,8 +3,9 @@ package com.github.pjfanning.zio.micrometer.unsafe
 import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
-import zio.{Clock, Duration, ZIO}
+import zio.{Duration, ZIO}
 import zio.test.Assertion._
+import zio.test.TestAspect._
 import zio.test.assert
 
 import java.util.concurrent.atomic.AtomicReference
@@ -15,7 +16,7 @@ import zio.test.ZIOSpecDefault
 object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-  private val env = Clock.live ++ Registry.makeWith(registry)
+  private val env = Registry.makeWith(registry)
 
   val counterTestZIO: ZIO[Registry, Throwable, Counter] = for {
     c <- Counter.labelled("simple_counter", None, Seq("method", "resource"))
@@ -49,7 +50,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
       tFunctionGaugeHolder, _.get())
   } yield g(Seq("get", "users"))
 
-  val timeGaugeTestZIO: ZIO[Registry with Clock, Throwable, TimeGauge] = for {
+  val timeGaugeTestZIO: ZIO[Registry, Throwable, TimeGauge] = for {
     g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
     timer <- g(Array("get", "users")).startTimerSample()
     _ <- ZIO.sleep(Duration.fromMillis(250))
@@ -109,7 +110,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
             gauge <- timeGaugeTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
           } yield assert(gaugeValue)(isGreaterThanEqualTo(0.0))
-        }
+        } @@ withLiveClock
       )
     ).provideCustomLayer(env)
 }

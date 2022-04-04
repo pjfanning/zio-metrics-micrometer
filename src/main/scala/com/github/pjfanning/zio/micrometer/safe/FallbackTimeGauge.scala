@@ -3,7 +3,7 @@ package com.github.pjfanning.zio.micrometer.safe
 import com.github.pjfanning.zio.micrometer.{TimeGauge, TimerSample}
 import com.github.pjfanning.zio.micrometer.unsafe.AtomicDouble
 import io.micrometer.core.instrument.util.TimeUtils
-import zio.{Duration, UIO}
+import zio.{Clock, Duration, UIO}
 
 import scala.compat.java8.DurationConverters.toScala
 import scala.concurrent.duration.{FiniteDuration, TimeUnit}
@@ -16,15 +16,14 @@ private[safe] class FallbackTimeGauge(baseUnit: TimeUnit) extends TimeGauge {
   }
   override def startTimerSample(): UIO[TimerSample] = UIO.succeed {
     new TimerSample {
-      val startTime = zio.Runtime.default.unsafeRun(zio.Clock.currentTime(baseUnit))
+      val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(baseUnit))
       override def stop(): UIO[Unit] = {
-        val task = for {
-          endTime <- zio.Clock.currentTime(baseUnit)
+        for {
+          endTime <- Clock.currentTime(baseUnit)
         } yield {
           atomicDouble.addAndGet(endTime - startTime)
           ()
         }
-        task.provideLayer(zio.Clock.live)
       }
     }
   }
