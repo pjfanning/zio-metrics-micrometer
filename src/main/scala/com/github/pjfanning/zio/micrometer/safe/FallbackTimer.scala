@@ -1,7 +1,7 @@
 package com.github.pjfanning.zio.micrometer.safe
 
 import com.github.pjfanning.zio.micrometer.{LongTaskTimer, Timer, TimerSample}
-import zio.{Semaphore, UIO}
+import zio.{Clock, Semaphore, UIO}
 
 import scala.compat.java8.DurationConverters.toScala
 import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
@@ -33,13 +33,12 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
   }
   override def startTimerSample(): UIO[TimerSample] = UIO.succeed {
     new TimerSample {
-      val startTime = zio.Runtime.default.unsafeRun(zio.Clock.currentTime(baseUnit))
+      val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(baseUnit))
       override def stop(): UIO[Unit] = {
-        val task = for {
-          endTime <- zio.Clock.currentTime(baseUnit)
+        for {
+          endTime <- Clock.currentTime(baseUnit)
           _ <- record(FiniteDuration(endTime - startTime, baseUnit))
         } yield ()
-        task.provideLayer(zio.Clock.live)
       }
     }
   }

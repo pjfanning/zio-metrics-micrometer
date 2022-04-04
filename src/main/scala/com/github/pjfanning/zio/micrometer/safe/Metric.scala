@@ -3,7 +3,7 @@ package com.github.pjfanning.zio.micrometer.safe
 import com.github.pjfanning.zio.micrometer.{Counter, DistributionSummary, Gauge, LongTaskTimer, ReadOnlyGauge, ReadOnlyTimeGauge, TimeGauge, Timer, TimerSample}
 import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, DistributionSummary => UnsafeDistributionSummary, Gauge => UnsafeGauge, TimeGauge => UnsafeTimeGauge, Timer => UnsafeTimer}
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
-import zio.{Clock, URIO, ZIO}
+import zio.{URIO, ZIO}
 
 import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, TimeUnit}
 import scala.util.control.NonFatal
@@ -155,7 +155,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     for {
       registry<- ZIO.environment[Registry]
       result <- UnsafeTimeGauge.labelled(name, help, labelNames, timeUnit)
-        .provideLayer(registry.get.unsafeRegistryLayer ++ Clock.live)
+        .provideLayer(registry.get.unsafeRegistryLayer)
         .catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
@@ -173,7 +173,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     for {
       registry <- ZIO.environment[Registry]
       result <- UnsafeTimeGauge.unlabelled(name, help)
-        .provideLayer(registry.get.unsafeRegistryLayer ++ Clock.live)
+        .provideLayer(registry.get.unsafeRegistryLayer)
         .catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
