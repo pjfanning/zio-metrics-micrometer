@@ -9,7 +9,7 @@ import zio.test.{ZIOSpecDefault, assert}
 object MicrometerSafeTest extends ZIOSpecDefault {
 
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-  private val env = Clock.live ++ Registry.makeWith(registry)
+  private val env = Registry.makeWith(registry)
 
   val counterTestZIO: ZIO[Registry, Throwable, Counter] = for {
     c <- Counter.labelled("simple_counter", None, Seq("method", "resource"))
