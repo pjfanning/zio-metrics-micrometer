@@ -20,7 +20,7 @@ object MicrometerSafeTest extends DefaultRunnableSpec {
 
   val counterTestZIO: ZIO[Registry with Logging, Throwable, Counter] = for {
     c <- Counter.labelled("simple_counter", None, Seq("method", "resource"))
-    _ <- c(Seq("get", "users")).inc
+    _ <- c(Seq("get", "users")).inc()
     _ <- c(Array("get", "users")).inc(2)
   } yield c(Seq("get", "users"))
 

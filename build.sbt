@@ -2,8 +2,6 @@ import sbtghactions.JavaSpec.Distribution.Zulu
 
 organization := "com.github.pjfanning"
 
-ThisBuild / version := "0.1.1-SNAPSHOT"
-
 ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.1")
 
