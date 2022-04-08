@@ -20,7 +20,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   val counterTestZIO: ZIO[Registry, Throwable, Counter] = for {
     c <- Counter.labelled("simple_counter", None, Seq("method", "resource"))
-    _ <- c(Seq("get", "users")).inc
+    _ <- c(Seq("get", "users")).inc()
     _ <- c(Array("get", "users")).inc(2)
   } yield c(Seq("get", "users"))
 
@@ -33,7 +33,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
 
   val gaugeTestZIO: ZIO[Registry, Throwable, Gauge] = for {
     g <- Gauge.labelled("simple_gauge", None, Array("method", "resource"))
-    _ <- g(Array("get", "users")).inc
+    _ <- g(Array("get", "users")).inc()
     _ <- g(Array("get", "users")).inc(2)
     _ <- g(Array("get", "users")).dec(0.5)
   } yield g(Seq("get", "users"))

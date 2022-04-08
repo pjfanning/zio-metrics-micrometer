@@ -10,7 +10,7 @@ object MicrometerSafeTest extends ZIOSpecDefault {
 
   val counterTestZIO: ZIO[Registry, Throwable, Counter] = for {
     c <- Counter.labelled("simple_counter", None, Seq("method", "resource"))
-    _ <- c(Seq("get", "users")).inc
+    _ <- c(Seq("get", "users")).inc()
     _ <- c(Array("get", "users")).inc(2)
   } yield c(Seq("get", "users"))
   private val registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
