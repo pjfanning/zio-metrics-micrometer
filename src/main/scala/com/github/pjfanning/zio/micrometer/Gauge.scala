@@ -8,8 +8,8 @@ trait ReadOnlyGauge {
 
 trait Gauge extends ReadOnlyGauge {
   def set(value: Double): UIO[Unit]
-  def inc: UIO[Unit] = inc(1)
+  def inc(): UIO[Unit] = inc(1)
   def inc(amount: Double): UIO[Unit]
-  def dec: UIO[Unit] = dec(1)
+  def dec(): UIO[Unit] = dec(1)
   def dec(amount: Double): UIO[Unit]
 }
