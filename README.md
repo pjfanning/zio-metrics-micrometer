@@ -12,10 +12,10 @@ There are snapshot releases available at https://oss.sonatype.org/content/reposi
 libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.0-SNAPSHOT"
 ```
 
-|Release|Branch|Description|
-|---|---|---|
-|0.1.0-SNAPSHOT|zio1|ZIO 1 support|
-|0.20.0-SNAPSHOT|zio2|ZIO 2 support|
+| Release |Branch|Description|
+|--------|---|---|
+| 0.1.1  |zio1|ZIO 1 support. Far from production ready.|
+| 0.20.1 |zio2|ZIO 2 support. Far from production ready.|
 
 ## Safe vs Unsafe
 * the 'unsafe' API returns ZIO effects that can fail
