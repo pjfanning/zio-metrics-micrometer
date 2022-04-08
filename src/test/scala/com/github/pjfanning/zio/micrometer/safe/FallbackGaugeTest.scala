@@ -54,7 +54,7 @@ object FallbackGaugeTest extends ZIOSpecDefault {
           _ <- gauge.set(-2.5)
           gaugeValue <- gauge.get
         } yield assert(gaugeValue)(equalTo(-2.5))
-      },
+      }
     )
   )
 }
