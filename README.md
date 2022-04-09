@@ -42,7 +42,7 @@ The current API uses the terms `labelled` and `unlabelled` based on zio-metrics 
   private def recordCount(method: String, path: String) = {
     for {
       c <- Counter.labelled("http", Some("HTTP counts"), Seq("method", "path"))
-      result <- c(Seq(method, path)).inc
+      result <- c(Seq(method, path)).inc()
     } yield result
   }
 ```
