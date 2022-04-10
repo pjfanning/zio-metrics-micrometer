@@ -1,6 +1,5 @@
 package com.github.pjfanning.zio.micrometer.safe
 
-import com.github.pjfanning.zio.micrometer.safe.FallbackCounterTest.test
 import zio.test.Assertion.equalTo
 import zio.test.{ZIOSpecDefault, assert}
 
