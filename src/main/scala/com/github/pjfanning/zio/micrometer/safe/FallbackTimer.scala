@@ -16,7 +16,7 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
   override def max(timeUnit: TimeUnit): UIO[Double] = UIO.succeed(Duration(_max, baseUnit).toUnit(timeUnit))
   override def mean(timeUnit: TimeUnit): UIO[Double] = UIO.succeed {
     if (_count == 0) {
-      Double.NaN
+      0.0
     } else {
       val avg = _total / _count
       Duration(avg, baseUnit).toUnit(timeUnit)
@@ -26,7 +26,11 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
     _count += 1
     val value = duration.toUnit(baseUnit)
     _total += value
-    _max = Math.max(_max, value)
+    if (_count == 0) {
+      _max = value
+    } else {
+      _max = Math.max(_max, value)
+    }
   }
   override def record(duration: zio.Duration): UIO[Unit] = {
     record(toScala(duration))
