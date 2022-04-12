@@ -3,7 +3,7 @@ import sbtghactions.JavaSpec.Distribution.Zulu
 organization := "com.github.pjfanning"
 
 ThisBuild / scalaVersion := "2.13.8"
-ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.1")
+ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.2")
 
 val micrometerVersion = "1.8.4"
 val zioVersion        = "1.0.13"
