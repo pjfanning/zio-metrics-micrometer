@@ -1,7 +1,7 @@
 package com.github.pjfanning.zio.micrometer
 
 import io.micrometer.core.instrument
-import zio.{RIO, Semaphore, Task, UIO, ULayer, ZIO}
+import zio.{RIO, Semaphore, Task, UIO, ULayer, ZIO, ZLayer}
 
 import scala.collection.JavaConverters._
 
@@ -37,7 +37,7 @@ package object unsafe {
     }
 
     def makeService(registry: instrument.MeterRegistry): UIO[Registry.Service] = ServiceImpl.makeWith(registry)
-    def makeWith(registry: instrument.MeterRegistry): ULayer[Registry] = makeService(registry).toLayer
+    def makeWith(registry: instrument.MeterRegistry): ULayer[Registry] = ZLayer(makeService(registry))
   }
 
   def meterRegistry: RIO[Registry, instrument.MeterRegistry] =
