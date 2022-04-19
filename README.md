@@ -9,13 +9,13 @@ Micrometer supports many metric backends (eg Prometheus, Dropwizard, StatsD, etc
 There are snapshot releases available at https://oss.sonatype.org/content/repositories/snapshots.
 
 ```scala
-libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.1"
+libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.2"
 ```
 
 | Release |Branch|Description|
 |--------|---|---|
-| 0.1.1  |zio1|ZIO 1 support. Far from production ready.|
-| 0.20.1 |zio2|ZIO 2 support. Far from production ready.|
+| 0.1.2  |zio1|ZIO 1 support. Far from production ready.|
+| 0.20.2 |zio2|ZIO 2 support. Far from production ready.|
 
 ## Safe vs Unsafe
 * the 'unsafe' API returns ZIO effects that can fail
