@@ -4,13 +4,12 @@ import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.clock.Clock
-import zio.duration.Duration
 import zio.test.Assertion._
 import zio.test.{DefaultRunnableSpec, ZSpec, assert}
 import zio.ZIO
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.NANOSECONDS
+import scala.concurrent.duration._
 import scala.util.Random
 
 object MicrometerUnsafeTest extends DefaultRunnableSpec {
@@ -51,9 +50,14 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
   } yield g(Seq("get", "users"))
 
   val timeGaugeTestZIO: ZIO[Registry with Clock, Throwable, TimeGauge] = for {
-    g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
+    g <- TimeGauge.labelled("plain_time_gauge", None, Array("method", "resource"))
+    _ <- g(Array("get", "users")).record(10.seconds)
+  } yield g(Seq("get", "users"))
+
+  val timeGaugeTimerTestZIO: ZIO[Registry with Clock, Throwable, TimeGauge] = for {
+    g <- TimeGauge.labelled("timer_time_gauge", None, Array("method", "resource"))
     timer <- g(Array("get", "users")).startTimerSample()
-    _ <- ZIO.sleep(Duration.fromMillis(250))
+    _ <- ZIO.sleep(zio.duration.Duration.fromMillis(250))
     _ <- timer.stop()
   } yield g(Seq("get", "users"))
 
@@ -104,10 +108,16 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
         }
       ),
       suite("TimeGauge")(
+        testM("gauge records duration") {
+          for {
+            gauge <- timeGaugeTestZIO
+            gaugeValue <- gauge.totalTime(NANOSECONDS)
+          } yield assert(gaugeValue)(equalTo(10.0 * 1000000000))
+        },
         testM("gauge applies timer") {
           //TODO the assertion should be non-zero but occasionally the result is zero and this needs investigation
           for {
-            gauge <- timeGaugeTestZIO
+            gauge <- timeGaugeTimerTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
           } yield assert(gaugeValue)(isGreaterThanEqualTo(0.0))
         }
