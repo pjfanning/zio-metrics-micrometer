@@ -9,7 +9,7 @@ import zio.test.TestAspect._
 import zio.test.assert
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.NANOSECONDS
+import scala.concurrent.duration._
 import scala.util.Random
 import zio.test.ZIOSpecDefault
 
@@ -51,6 +51,11 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
   } yield g(Seq("get", "users"))
 
   val timeGaugeTestZIO: ZIO[Registry, Throwable, TimeGauge] = for {
+    g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
+    _ <- g(Array("get", "users")).record(10.seconds)
+  } yield g(Seq("get", "users"))
+
+  val timeGaugeTimerTestZIO: ZIO[Registry, Throwable, TimeGauge] = for {
     g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
     timer <- g(Array("get", "users")).startTimerSample()
     _ <- ZIO.sleep(Duration.fromMillis(250))
@@ -104,10 +109,16 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
         }
       ),
       suite("TimeGauge")(
+        test("gauge records duration") {
+          for {
+            gauge <- timeGaugeTestZIO
+            gaugeValue <- gauge.totalTime(NANOSECONDS)
+          } yield assert(gaugeValue)(equalTo(10.0 * 1_000_000_000))
+        } @@ withLiveClock,
         test("gauge applies timer") {
           //TODO the assertion should be non-zero but occasionally the result is zero and this needs investigation
           for {
-            gauge <- timeGaugeTestZIO
+            gauge <- timeGaugeTimerTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
           } yield assert(gaugeValue)(isGreaterThanEqualTo(0.0))
         } @@ withLiveClock
