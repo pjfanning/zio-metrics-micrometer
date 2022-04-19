@@ -113,7 +113,7 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
           for {
             gauge <- timeGaugeTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
-          } yield assert(gaugeValue)(equalTo(10.0 * 1_000_000_000))
+          } yield assert(gaugeValue)(equalTo(10.0 * 1000000000))
         } @@ withLiveClock,
         test("gauge applies timer") {
           //TODO the assertion should be non-zero but occasionally the result is zero and this needs investigation
