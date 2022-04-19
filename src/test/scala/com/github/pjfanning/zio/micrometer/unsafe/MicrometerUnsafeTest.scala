@@ -51,12 +51,12 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
   } yield g(Seq("get", "users"))
 
   val timeGaugeTestZIO: ZIO[Registry, Throwable, TimeGauge] = for {
-    g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
+    g <- TimeGauge.labelled("plain_time_gauge", None, Array("method", "resource"))
     _ <- g(Array("get", "users")).record(10.seconds)
   } yield g(Seq("get", "users"))
 
   val timeGaugeTimerTestZIO: ZIO[Registry, Throwable, TimeGauge] = for {
-    g <- TimeGauge.labelled("time_gauge", None, Array("method", "resource"))
+    g <- TimeGauge.labelled("timer_time_gauge", None, Array("method", "resource"))
     timer <- g(Array("get", "users")).startTimerSample()
     _ <- ZIO.sleep(Duration.fromMillis(250))
     _ <- timer.stop()
