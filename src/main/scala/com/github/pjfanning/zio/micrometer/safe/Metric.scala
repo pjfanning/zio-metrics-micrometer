@@ -20,7 +20,7 @@ object Counter extends LabelledMetric[Registry, Counter] {
       result <- UnsafeCounter.labelled(name, help, labelNames).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating counter " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackCounter)
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackCounter)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -35,7 +35,7 @@ object Counter extends LabelledMetric[Registry, Counter] {
       result <- UnsafeCounter.unlabelled(name, help).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating counter " + t)
-          val fallbackZio = URIO.succeed(new FallbackCounter)
+          val fallbackZio = ZIO.succeed(new FallbackCounter)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -54,7 +54,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.labelled(name, help, labelNames).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating gauge " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackGauge)
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackGauge)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -69,7 +69,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.unlabelled(name, help).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating gauge " + t)
-          val fallbackZio = URIO.succeed(new FallbackGauge)
+          val fallbackZio = ZIO.succeed(new FallbackGauge)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -86,7 +86,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.labelledFunction(name, help, labelNames, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating gauge " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackFunctionGauge(fun))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackFunctionGauge(fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -102,7 +102,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.unlabelledFunction(name, help, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating gauge " + t)
-          val fallbackZio = URIO.succeed(new FallbackFunctionGauge(fun))
+          val fallbackZio = ZIO.succeed(new FallbackFunctionGauge(fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -120,7 +120,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.labelledTFunction(name, help, labelNames, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(throwable) =>
           val logZio = ZIO.log("Issue creating gauge " + throwable)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTFunctionGauge(t, fun))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackTFunctionGauge(t, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -137,7 +137,7 @@ object Gauge extends LabelledMetric[Registry, Gauge] {
       result <- UnsafeGauge.unlabelledTFunction(name, help, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(throwable) =>
           val logZio = ZIO.log("Issue creating gauge " + throwable)
-          val fallbackZio = URIO.succeed(new FallbackTFunctionGauge(t, fun))
+          val fallbackZio = ZIO.succeed(new FallbackTFunctionGauge(t, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -159,7 +159,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
         .catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimeGauge(timeUnit))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackTimeGauge(timeUnit))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -177,7 +177,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
         .catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
-          val fallbackZio = URIO.succeed(new FallbackTimeGauge(timeUnit))
+          val fallbackZio = ZIO.succeed(new FallbackTimeGauge(timeUnit))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -196,7 +196,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
         .provide(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackFunctionTimeGauge(timeUnit, fun))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackFunctionTimeGauge(timeUnit, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -213,7 +213,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
       result <- UnsafeTimeGauge.unlabelledFunction(name, help, timeUnit, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating time gauge " + t)
-          val fallbackZio = URIO.succeed(new FallbackFunctionTimeGauge(timeUnit, fun))
+          val fallbackZio = ZIO.succeed(new FallbackFunctionTimeGauge(timeUnit, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -232,7 +232,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
       result <- UnsafeTimeGauge.labelledTFunction(name, help, labelNames, timeUnit, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(throwable) =>
           val logZio = ZIO.log("Issue creating time gauge " + throwable)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTFunctionTimeGauge(timeUnit, t, fun))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackTFunctionTimeGauge(timeUnit, t, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -250,7 +250,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
       result <- UnsafeTimeGauge.unlabelledTFunction(name, help, timeUnit, t, fun).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(throwable) =>
           val logZio = ZIO.log("Issue creating time gauge " + throwable)
-          val fallbackZio = URIO.succeed(new FallbackTFunctionTimeGauge(timeUnit, t, fun))
+          val fallbackZio = ZIO.succeed(new FallbackTFunctionTimeGauge(timeUnit, t, fun))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -292,7 +292,7 @@ object DistributionSummary extends LabelledMetric[Registry, DistributionSummary]
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating DistributionSummary " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackDistributionSummary)
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackDistributionSummary)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -330,7 +330,7 @@ object DistributionSummary extends LabelledMetric[Registry, DistributionSummary]
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating DistributionSummary " + t)
-          val fallbackZio = URIO.succeed(new FallbackDistributionSummary)
+          val fallbackZio = ZIO.succeed(new FallbackDistributionSummary)
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -370,7 +370,7 @@ object Timer extends LabelledMetric[Registry, Timer] {
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating Timer " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -404,7 +404,7 @@ object Timer extends LabelledMetric[Registry, Timer] {
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating Timer " + t)
-          val fallbackZio = URIO.succeed(new FallbackTimer(NANOSECONDS))
+          val fallbackZio = ZIO.succeed(new FallbackTimer(NANOSECONDS))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -438,7 +438,7 @@ object Timer extends LabelledMetric[Registry, Timer] {
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating LongTaskTimer " + t)
-          val fallbackZio = URIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
+          val fallbackZio = ZIO.succeed((_: Seq[String]) => new FallbackTimer(NANOSECONDS))
           fallbackZio.zipPar(logZio)
       }
     } yield result
@@ -470,7 +470,7 @@ object Timer extends LabelledMetric[Registry, Timer] {
       ).provideLayer(registry.get.unsafeRegistryLayer).catchAll {
         case NonFatal(t) =>
           val logZio = ZIO.log("Issue creating LongTaskTimer " + t)
-          val fallbackZio = URIO.succeed(new FallbackTimer(NANOSECONDS))
+          val fallbackZio = ZIO.succeed(new FallbackTimer(NANOSECONDS))
           fallbackZio.zipPar(logZio)
       }
     } yield result

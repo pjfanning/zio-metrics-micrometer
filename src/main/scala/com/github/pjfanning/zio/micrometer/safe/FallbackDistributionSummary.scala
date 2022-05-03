@@ -1,17 +1,17 @@
 package com.github.pjfanning.zio.micrometer.safe
 
 import com.github.pjfanning.zio.micrometer.DistributionSummary
-import zio.{Semaphore, UIO}
+import zio.{Semaphore, UIO, ZIO}
 
 private[safe] class FallbackDistributionSummary extends DistributionSummary {
   private val semaphore = Semaphore.make(permits = 1)
   private var _count: Int = 0
   private var _max: Double = 0
   private var _total: Double = 0.0
-  override def count: UIO[Double] = UIO.succeed(_count)
-  override def totalAmount: UIO[Double] = UIO.succeed(_total)
-  override def max: UIO[Double] = UIO.succeed(_max)
-  override def mean: UIO[Double] = UIO.succeed {
+  override def count: UIO[Double] = ZIO.succeed(_count)
+  override def totalAmount: UIO[Double] = ZIO.succeed(_total)
+  override def max: UIO[Double] = ZIO.succeed(_max)
+  override def mean: UIO[Double] = ZIO.succeed {
     if (_count == 0) 0.0 else _total / _count
   }
   override def record(value: Double): UIO[Unit] = semaphore.map { _ =>

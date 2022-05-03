@@ -1,7 +1,7 @@
 package com.github.pjfanning.zio.micrometer.safe
 
 import com.github.pjfanning.zio.micrometer.{LongTaskTimer, Timer, TimerSample}
-import zio.{Clock, Semaphore, UIO}
+import zio.{Clock, Semaphore, UIO, ZIO}
 
 import scala.compat.java8.DurationConverters.toScala
 import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
@@ -11,10 +11,10 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
   private var _count: Int = 0
   private var _max: Double = 0.0
   private var _total: Double = 0.0
-  override def count: UIO[Double] = UIO.succeed(_count)
-  override def totalTime(timeUnit: TimeUnit): UIO[Double] = UIO.succeed(Duration(_total, baseUnit).toUnit(timeUnit))
-  override def max(timeUnit: TimeUnit): UIO[Double] = UIO.succeed(Duration(_max, baseUnit).toUnit(timeUnit))
-  override def mean(timeUnit: TimeUnit): UIO[Double] = UIO.succeed {
+  override def count: UIO[Double] = ZIO.succeed(_count)
+  override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(Duration(_total, baseUnit).toUnit(timeUnit))
+  override def max(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(Duration(_max, baseUnit).toUnit(timeUnit))
+  override def mean(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed {
     if (_count == 0) {
       0.0
     } else {
@@ -35,7 +35,7 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
   override def record(duration: zio.Duration): UIO[Unit] = {
     record(toScala(duration))
   }
-  override def startTimerSample(): UIO[TimerSample] = UIO.succeed {
+  override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
     new TimerSample {
       val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(baseUnit))
       override def stop(): UIO[Unit] = {
@@ -46,5 +46,5 @@ private[safe] class FallbackTimer(baseUnit: TimeUnit) extends Timer with LongTas
       }
     }
   }
-  override def baseTimeUnit: UIO[TimeUnit] = UIO.succeed(baseUnit)
+  override def baseTimeUnit: UIO[TimeUnit] = ZIO.succeed(baseUnit)
 }
