@@ -1,4 +1,4 @@
-import sbtghactions.JavaSpec.Distribution.Zulu
+import org.typelevel.sbt.gha.JavaSpec.Distribution.Zulu
 
 organization := "com.github.pjfanning"
 
@@ -55,7 +55,6 @@ pomExtra := (
   )
 
 ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec(Zulu, "8"))
-ThisBuild / githubWorkflowTargetTags ++= Seq("v*")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq(
   RefPredicate.Equals(Ref.Branch("zio1")),
   RefPredicate.Equals(Ref.Branch("zio2")),
