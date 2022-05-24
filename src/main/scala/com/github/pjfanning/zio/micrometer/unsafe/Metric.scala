@@ -739,7 +739,7 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
               override def stop(): UIO[Unit] = for {
                 endTime <- Clock.currentTime(NANOSECONDS)
               } yield {
-                val elapsed = scala.concurrent.duration.Duration(endTime - startTime, NANOSECONDS).toUnit(mGauge.baseTimeUnit())
+                val elapsed = (endTime - startTime).toDouble / NANOSECONDS.convert(1, mGauge.baseTimeUnit())
                 atomicDouble.addAndGet(elapsed)
               }
             }
