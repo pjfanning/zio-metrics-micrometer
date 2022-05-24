@@ -5,7 +5,8 @@ import com.github.pjfanning.zio.micrometer.unsafe.{Counter => UnsafeCounter, Dis
 import io.micrometer.core.instrument.distribution.pause.PauseDetector
 import zio.{URIO, ZIO}
 
-import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, TimeUnit}
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, SECONDS}
 import scala.util.control.NonFatal
 
 object Counter extends LabelledMetric[Registry, Counter] {
@@ -150,7 +151,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit
+    timeUnit: TimeUnit = SECONDS
   ): URIO[Registry, Seq[String] => TimeGauge] = {
     for {
       registry<- ZIO.environment[Registry]
