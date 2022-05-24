@@ -5,7 +5,7 @@ organization := "com.github.pjfanning"
 ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.2")
 
-val micrometerVersion = "1.8.5"
+val micrometerVersion = "1.9.0"
 val zioVersion        = "2.0.0-RC6"
 
 lazy val root = (project in file("."))
