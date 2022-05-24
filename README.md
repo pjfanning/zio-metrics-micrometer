@@ -1,6 +1,5 @@
 # zio-metrics-micrometer
-
-Very early days trying to produce an equivalent of [zio-metrics](https://github.com/zio/zio-metrics) that uses [Micrometer](https://micrometer.io/) instead of directly supporting a specific metrics backend (eg Prometheus, Dropwizard, etc.).
+An effort to produce an equivalent of [zio-metrics](https://github.com/zio/zio-metrics) that uses [Micrometer](https://micrometer.io/) instead of directly supporting a specific metrics backend (eg Prometheus, Dropwizard, etc.).
 
 The API is based on the prometheus2 package of zio-metrics but has been modified somewhat. The initial aim is to get some feedback on the API before adding support for all [Micrometer](https://micrometer.io/) metric types and adding full test coverage. Micrometer's aim is provide a common interface for multiple metric backends analagous to how [Slf4J](https://www.slf4j.org/) works for logging backends.
 
@@ -9,13 +8,13 @@ Micrometer supports many metric backends (eg Prometheus, Dropwizard, StatsD, etc
 There are snapshot releases available at https://oss.sonatype.org/content/repositories/snapshots.
 
 ```scala
-libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.2"
+libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.3"
 ```
 
 | Release |Branch|Description|
 |--------|---|---|
-| 0.1.2  |zio1|ZIO 1 support. Far from production ready.|
-| 0.20.2 |zio2|ZIO 2 support. Far from production ready.|
+| 0.1.2  |zio1|ZIO 1 support. Still a prototype.|
+| 0.20.3 |zio2|ZIO 2 support. Still a prototype.|
 
 ## Safe vs Unsafe
 * the 'unsafe' API returns ZIO effects that can fail
