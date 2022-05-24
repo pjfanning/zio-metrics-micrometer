@@ -10,7 +10,7 @@ import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, SECONDS, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -732,12 +732,17 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         override def record(duration: FiniteDuration): UIO[Unit] = ZIO.succeed {
           atomicDouble.addAndGet(duration.toUnit(mGauge.baseTimeUnit()))
         }
-        override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
-          new TimerSample {
-            val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(mGauge.baseTimeUnit()))
-            override def stop(): UIO[Unit] = for {
-              endTime <- Clock.currentTime(mGauge.baseTimeUnit())
-            } yield atomicDouble.addAndGet(endTime - startTime)
+        override def startTimerSample(): UIO[TimerSample] = {
+          ZIO.succeed {
+            new TimerSample {
+              val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(NANOSECONDS))
+              override def stop(): UIO[Unit] = for {
+                endTime <- Clock.currentTime(NANOSECONDS)
+              } yield {
+                val elapsed = scala.concurrent.duration.Duration(endTime - startTime, NANOSECONDS).toUnit(mGauge.baseTimeUnit())
+                atomicDouble.addAndGet(elapsed)
+              }
+            }
           }
         }
       }
