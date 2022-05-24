@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge, Timer}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.clock.Clock
@@ -56,6 +56,13 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
 
   val timeGaugeTimerTestZIO: ZIO[Registry with Clock, Throwable, TimeGauge] = for {
     g <- TimeGauge.labelled("timer_time_gauge", None, Array("method", "resource"))
+    timer <- g(Array("get", "users")).startTimerSample()
+    _ <- ZIO.sleep(zio.duration.Duration.fromMillis(250))
+    _ <- timer.stop()
+  } yield g(Seq("get", "users"))
+
+  val timerTimerTestZIO: ZIO[Registry with Clock, Throwable, Timer] = for {
+    g <- Timer.labelled("timer_timer", None, Array("method", "resource"))
     timer <- g(Array("get", "users")).startTimerSample()
     _ <- ZIO.sleep(zio.duration.Duration.fromMillis(250))
     _ <- timer.stop()
@@ -119,6 +126,14 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
             gauge <- timeGaugeTimerTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
           } yield assert(gaugeValue)(isGreaterThanEqualTo(250.0))
+        }
+      ),
+      suite("Timer")(
+        testM("timer applies timer") {
+          for {
+            timer <- timerTimerTestZIO
+            timerValue <- timer.totalTime(NANOSECONDS)
+          } yield assert(timerValue)(isGreaterThanEqualTo(250.0))
         }
       )
     ).provideCustomLayer(env)
