@@ -188,7 +188,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     fun: => Double
   ): URIO[Registry, Seq[String] => ReadOnlyTimeGauge] = {
     for {
@@ -206,7 +206,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
   def unlabelledFunction(
     name: String,
     help: Option[String] = None,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     fun: => Double
   ): URIO[Registry, ReadOnlyTimeGauge] = {
     for {
@@ -224,7 +224,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     t: T,
     fun: T => Double
   ): URIO[Registry, Seq[String] => ReadOnlyTimeGauge] = {
@@ -242,7 +242,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
   def unlabelledTFunction[T](
     name: String,
     help: Option[String] = None,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     t: T,
     fun: T => Double
   ): URIO[Registry, ReadOnlyTimeGauge] = {
