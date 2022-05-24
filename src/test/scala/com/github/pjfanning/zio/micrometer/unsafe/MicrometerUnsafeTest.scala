@@ -115,11 +115,10 @@ object MicrometerUnsafeTest extends DefaultRunnableSpec {
           } yield assert(gaugeValue)(equalTo(10.0 * 1000000000))
         },
         testM("gauge applies timer") {
-          //TODO the assertion should be non-zero but occasionally the result is zero and this needs investigation
           for {
             gauge <- timeGaugeTimerTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
-          } yield assert(gaugeValue)(isGreaterThanEqualTo(0.0))
+          } yield assert(gaugeValue)(isGreaterThanEqualTo(250.0))
         }
       )
     ).provideCustomLayer(env)

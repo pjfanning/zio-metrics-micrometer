@@ -12,7 +12,7 @@ import java.util.function.Supplier
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 import scala.compat.java8.DurationConverters._
-import scala.concurrent.duration.{FiniteDuration, SECONDS, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, SECONDS, TimeUnit}
 
 private case class MeterKey(name: String, tags: Iterable[instrument.Tag])
 
@@ -737,10 +737,13 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         }
         override def startTimerSample(): UIO[TimerSample] = ZIO.effectTotal {
           new TimerSample {
-            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(mGauge.baseTimeUnit()))
+            val startTime = zio.Runtime.default.unsafeRun(clock.currentTime(NANOSECONDS))
             override def stop(): UIO[Unit] = for {
-              endTime <- clock.currentTime(mGauge.baseTimeUnit())
-            } yield atomicDouble.addAndGet(endTime - startTime)
+              endTime <- clock.currentTime(NANOSECONDS)
+            } yield {
+              val elapsed = scala.concurrent.duration.Duration(endTime - startTime, NANOSECONDS).toUnit(mGauge.baseTimeUnit())
+              atomicDouble.addAndGet(elapsed)
+            }
           }
         }
       }
