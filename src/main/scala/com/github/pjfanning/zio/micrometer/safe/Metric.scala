@@ -7,7 +7,7 @@ import zio.clock.Clock
 import zio.{URIO, ZIO}
 import zio.logging._
 
-import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, TimeUnit}
+import scala.concurrent.duration.{FiniteDuration, NANOSECONDS, SECONDS, TimeUnit}
 import scala.util.control.NonFatal
 
 object Counter extends LabelledMetric[Registry with Logging, Counter] {
@@ -152,7 +152,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit
+    timeUnit: TimeUnit = SECONDS
   ): URIO[Registry with Logging, Seq[String] => TimeGauge] = {
     for {
       registry <- ZIO.environment[Registry]
@@ -169,7 +169,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
   def unlabelled(
     name: String,
     help: Option[String] = None,
-    timeUnit: TimeUnit
+    timeUnit: TimeUnit = SECONDS
   ): URIO[Registry with Logging, TimeGauge] = {
     for {
       registry <- ZIO.environment[Registry]
@@ -188,7 +188,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     fun: => Double
   ): URIO[Registry with Logging, Seq[String] => ReadOnlyTimeGauge] = {
     for {
@@ -205,7 +205,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
   def unlabelledFunction(
     name: String,
     help: Option[String] = None,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     fun: => Double
   ): URIO[Registry with Logging, ReadOnlyTimeGauge] = {
     for {
@@ -223,7 +223,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
     name: String,
     help: Option[String] = None,
     labelNames: Seq[String] = Seq.empty,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     t: T,
     fun: T => Double
   ): URIO[Registry with Logging, Seq[String] => ReadOnlyTimeGauge] = {
@@ -241,7 +241,7 @@ object TimeGauge extends LabelledMetric[Registry, TimeGauge] {
   def unlabelledTFunction[T](
     name: String,
     help: Option[String] = None,
-    timeUnit: TimeUnit,
+    timeUnit: TimeUnit = SECONDS,
     t: T,
     fun: T => Double
   ): URIO[Registry with Logging, ReadOnlyTimeGauge] = {
