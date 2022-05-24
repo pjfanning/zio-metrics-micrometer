@@ -1,6 +1,6 @@
 package com.github.pjfanning.zio.micrometer.unsafe
 
-import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge}
+import com.github.pjfanning.zio.micrometer.{Counter, Gauge, HasMicrometerMeterId, ReadOnlyGauge, TimeGauge, Timer}
 import io.micrometer.core.instrument.Meter
 import io.micrometer.prometheus.{PrometheusConfig, PrometheusMeterRegistry}
 import zio.{Duration, ZIO}
@@ -62,6 +62,13 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
     _ <- timer.stop()
   } yield g(Seq("get", "users"))
 
+  val timerTimerTestZIO: ZIO[Registry, Throwable, Timer] = for {
+    g <- Timer.labelled("timer_timer", None, Array("method", "resource"))
+    timer <- g(Array("get", "users")).startTimerSample()
+    _ <- ZIO.sleep(Duration.fromMillis(250))
+    _ <- timer.stop()
+  } yield g(Seq("get", "users"))
+
   override def spec =
     suite("MicrometerUnsafeTest")(
       suite("Counter")(
@@ -114,12 +121,20 @@ object MicrometerUnsafeTest extends ZIOSpecDefault {
             gauge <- timeGaugeTestZIO
             gaugeValue <- gauge.totalTime(NANOSECONDS)
           } yield assert(gaugeValue)(equalTo(10.0 * 1000000000))
-        } @@ withLiveClock,
+        },
         test("gauge applies timer") {
           for {
             gauge <- timeGaugeTimerTestZIO
             gaugeValue <- gauge.totalTime(MILLISECONDS)
           } yield assert(gaugeValue)(isGreaterThanEqualTo(250.0))
+        } @@ withLiveClock
+      ),
+      suite("Timer")(
+        test("gauge applies timer") {
+          for {
+            timer <- timerTimerTestZIO
+            timerValue <- timer.totalTime(MILLISECONDS)
+          } yield assert(timerValue)(isGreaterThanEqualTo(250.0))
         } @@ withLiveClock
       )
     ).provideCustomLayer(env)
