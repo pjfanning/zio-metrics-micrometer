@@ -27,7 +27,7 @@ The current API uses the terms `labelled` and `unlabelled` based on zio-metrics 
 * [Counters](https://micrometer.io/docs/concepts#_counters) are used to count the number of events.
 * [Gauges](https://micrometer.io/docs/concepts#_gauges) are used to track values that can increase and decrease. zio-metrics-micrometer supports meters where the user gets to set, increment or decrement the values explicitly. It also supports wrapping function calls to existing functions that already have the values you want to track (e.g. you might have a connection pool instance that already has a function that returns the active connection count).
 * [Distribution Summaries](https://micrometer.io/docs/concepts#_distribution_summaries) are used to track value distributions. You can define percentiles or histogram buckets.
-* [Timers](https://micrometer.io/docs/concepts#_timers) are similar to Distribution Summaries but are specialised to cater for timing events. The zio-metrics-micrometer allows you to choose [Long Task Timers](https://micrometer.io/docs/concepts#_long_task_timers) as well.
+* [Timers](https://micrometer.io/docs/concepts#_timers) are similar to Distribution Summaries but are specialised to cater for timing events. zio-metrics-micrometer allows you to choose [Long Task Timers](https://micrometer.io/docs/concepts#_long_task_timers) as well.
 * [Time Gauges](https://micrometer.io/docs/concepts#_timegauge) are like Gauges but specialised for timing events.
 
 ## Example
