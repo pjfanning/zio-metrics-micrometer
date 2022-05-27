@@ -14,7 +14,8 @@ libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.2
 | Release |Branch|Description|
 |--------|---|---|
 | 0.1.4  |zio1|ZIO 1 support. Still a prototype.|
-| 0.20.5 |zio2|ZIO 2 support. Still a prototype.|
+| 0.20.2.1 |zio2-rc5|ZIO 2.0.0-RC5 support. Still a prototype.|
+| 0.20.5 |zio2|ZIO 2.0.0-RC6 support. Still a prototype.|
 
 ## Safe vs Unsafe
 * the 'unsafe' API returns ZIO effects that can fail
