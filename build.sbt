@@ -59,6 +59,7 @@ ThisBuild / githubWorkflowJavaVersions := Seq(JavaSpec(Zulu, "8"))
 ThisBuild / githubWorkflowPublishTargetBranches := Seq(
   RefPredicate.Equals(Ref.Branch("zio1")),
   RefPredicate.Equals(Ref.Branch("zio2")),
+  RefPredicate.Equals(Ref.Branch("zio2-rc5")),
   RefPredicate.StartsWith(Ref.Tag("v"))
 )
 
