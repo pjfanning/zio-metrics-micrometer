@@ -59,6 +59,20 @@ The current API uses the terms `labelled` and `unlabelled` based on zio-metrics 
     }
 ```
 
+### Timer Metric
+
+zio-http-example also has an example of how to use a Timer metric.
+
+```scala
+      val zio = for {
+        t <- Timer.labelled("http_timed", Some("HTTP timed"), Seq("method", "path"))
+        timer <- t(Seq("get", "timed")).startTimerSample()
+        _ <- ZIO.sleep(Duration(Random.nextInt(500), TimeUnit.MILLISECONDS))
+        _ <- timer.stop()
+      } yield Response.text("Hello World!")
+      zio.provideLayer(metricEnv)
+```
+
 ## API
 
 Counter (package `com.github.pjfanning.zio.micrometer.unsafe`)
