@@ -6,7 +6,7 @@ ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.2")
 
 val micrometerVersion = "1.9.0"
-val zioVersion        = "1.0.14"
+val zioVersion        = "1.0.15"
 val zioLoggingVersion = "0.5.14"
 
 lazy val root = (project in file("."))
