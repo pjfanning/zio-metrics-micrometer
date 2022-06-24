@@ -8,7 +8,7 @@ Micrometer supports many metric backends (eg Prometheus, Dropwizard, StatsD, etc
 There are snapshot releases available at https://oss.sonatype.org/content/repositories/snapshots.
 
 ```scala
-libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.5"
+libraryDependencies += "com.github.pjfanning" %% "zio-metrics-micrometer" % "0.20.6"
 ```
 
 | Release |Branch|Description|
