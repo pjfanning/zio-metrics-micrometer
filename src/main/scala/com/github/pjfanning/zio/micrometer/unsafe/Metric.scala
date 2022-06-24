@@ -723,24 +723,31 @@ object TimeGauge extends LabelledMetric[Registry, Throwable, TimeGauge] {
         .register(registry)
       new TimeGauge with HasMicrometerMeterId {
         override def getMeterId: UIO[Meter.Id] = ZIO.succeed(mGauge.getId)
+
         override def baseTimeUnit: UIO[TimeUnit] = ZIO.succeed(mGauge.baseTimeUnit())
+
         override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed(mGauge.value(timeUnit))
+
         override def record(duration: Duration): UIO[Unit] = ZIO.succeed {
           val convertedDuration = toScala(duration).toUnit(mGauge.baseTimeUnit())
           atomicDouble.addAndGet(convertedDuration)
         }
+
         override def record(duration: FiniteDuration): UIO[Unit] = ZIO.succeed {
           atomicDouble.addAndGet(duration.toUnit(mGauge.baseTimeUnit()))
         }
+
         override def startTimerSample(): UIO[TimerSample] = {
-          ZIO.succeed {
-            new TimerSample {
-              val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(NANOSECONDS))
-              override def stop(): UIO[Unit] = for {
+          for {
+            startTime <- zio.Runtime.default.run(Clock.currentTime(NANOSECONDS))
+          } yield new TimerSample {
+            override def stop(): UIO[Unit] = {
+              for {
                 endTime <- Clock.currentTime(NANOSECONDS)
               } yield {
                 val elapsed = (endTime - startTime).toDouble / NANOSECONDS.convert(1, mGauge.baseTimeUnit())
                 atomicDouble.addAndGet(elapsed)
+                ()
               }
             }
           }

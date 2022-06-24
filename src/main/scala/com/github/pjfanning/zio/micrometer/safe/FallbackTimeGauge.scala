@@ -14,9 +14,10 @@ private[safe] class FallbackTimeGauge(baseUnit: TimeUnit) extends TimeGauge {
   override def totalTime(timeUnit: TimeUnit): UIO[Double] = ZIO.succeed {
     TimeUtils.convert(atomicDouble.get(), baseUnit, timeUnit)
   }
-  override def startTimerSample(): UIO[TimerSample] = ZIO.succeed {
-    new TimerSample {
-      val startTime = zio.Runtime.default.unsafeRun(Clock.currentTime(baseUnit))
+  override def startTimerSample(): UIO[TimerSample] = {
+    for {
+      startTime <- zio.Runtime.default.run(Clock.currentTime(baseUnit))
+    } yield new TimerSample {
       override def stop(): UIO[Unit] = {
         for {
           endTime <- Clock.currentTime(baseUnit)
