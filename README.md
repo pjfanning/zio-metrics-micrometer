@@ -77,6 +77,10 @@ zio-http-example also has an example of how to use a Timer metric.
 
 ## API
 
+* Full [javadoc](https://pjfanning.github.io/zio-metrics-micrometer/)
+
+Sample for Counter:
+
 Counter (package `com.github.pjfanning.zio.micrometer.unsafe`)
 ```scala
   def labelled(
