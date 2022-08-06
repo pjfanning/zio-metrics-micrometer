@@ -5,8 +5,27 @@ organization := "com.github.pjfanning"
 ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / crossScalaVersions := Seq("2.12.15", "2.13.8", "3.1.3")
 
-val micrometerVersion = "1.9.1"
+val micrometerVersion = "1.9.2"
 val zioVersion        = "2.0.0"
+
+autoAPIMappings := true
+
+apiMappings ++= {
+  def mappingsFor(organization: String, names: List[String], location: String, revision: (String) => String = identity): Seq[(File, URL)] =
+    for {
+      entry: Attributed[File] <- (Compile / fullClasspath).value
+      module: ModuleID <- entry.get(moduleID.key)
+      if module.organization == organization
+      if names.exists(module.name.startsWith)
+    } yield entry.data -> url(location.format(revision(module.revision)))
+
+  val mappings: Seq[(File, URL)] =
+    mappingsFor("org.scala-lang", List("scala-library"), "https://scala-lang.org/api/%s/") ++
+      mappingsFor("dev.zio", List("zio"), "https://javadoc.io/doc/dev.zio/zio_2.13/%s/") ++
+      mappingsFor("io.micrometer", List("micrometer-core"), "https://javadoc.io/doc/io.micrometer/micrometer-core/%s/")
+
+  mappings.toMap
+}
 
 lazy val root = (project in file("."))
   .settings(
