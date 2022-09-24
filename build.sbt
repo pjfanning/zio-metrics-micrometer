@@ -2,10 +2,10 @@ import org.typelevel.sbt.gha.JavaSpec.Distribution.Zulu
 
 organization := "com.github.pjfanning"
 
-ThisBuild / scalaVersion := "2.13.8"
+ThisBuild / scalaVersion := "2.13.9"
 ThisBuild / crossScalaVersions := Seq("2.12.17", "2.13.9", "3.2.0")
 
-val micrometerVersion = "1.9.3"
+val micrometerVersion = "1.9.4"
 val zioVersion        = "1.0.17"
 val zioLoggingVersion = "0.5.14"
 
