@@ -3,9 +3,9 @@ import org.typelevel.sbt.gha.JavaSpec.Distribution.Zulu
 organization := "com.github.pjfanning"
 
 ThisBuild / scalaVersion := "2.13.10"
-ThisBuild / crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.0")
+ThisBuild / crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.1")
 
-val micrometerVersion = "1.9.5"
+val micrometerVersion = "1.10.0"
 val zioVersion        = "2.0.3"
 
 autoAPIMappings := true
