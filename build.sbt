@@ -5,7 +5,7 @@ organization := "com.github.pjfanning"
 ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.2")
 
-val micrometerVersion = "1.10.3"
+val micrometerVersion = "1.10.6"
 val zioVersion        = "2.0.12"
 
 autoAPIMappings := true
