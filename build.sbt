@@ -6,7 +6,7 @@ ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.2")
 
 val micrometerVersion = "1.11.0"
-val zioVersion        = "2.0.13"
+val zioVersion        = "2.0.15"
 
 autoAPIMappings := true
 
